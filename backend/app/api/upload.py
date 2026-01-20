@@ -1,11 +1,11 @@
 import os
 import uuid
-from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from typing import Optional, List
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Upload, UploadStatus
-from ..schemas import UploadResponse
+from ..schemas import UploadResponse, UploadDetail, StatusResponse
 from ..config import settings
 
 router = APIRouter()
@@ -48,3 +48,33 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
     db.refresh(upload)
 
     return upload
+
+
+@router.get("/uploads", response_model=List[UploadResponse])
+def list_uploads(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    status: Optional[UploadStatus] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(Upload)
+    if status:
+        query = query.filter(Upload.status == status)
+    uploads = query.order_by(Upload.uploaded_at.desc()).offset(skip).limit(limit).all()
+    return uploads
+
+
+@router.get("/uploads/{upload_id}", response_model=UploadDetail)
+def get_upload(upload_id: str, db: Session = Depends(get_db)):
+    upload = db.query(Upload).filter(Upload.id == upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    return upload
+
+
+@router.get("/uploads/{upload_id}/status", response_model=StatusResponse)
+def get_upload_status(upload_id: str, db: Session = Depends(get_db)):
+    upload = db.query(Upload).filter(Upload.id == upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    return StatusResponse(status=upload.status)
