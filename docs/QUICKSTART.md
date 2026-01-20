@@ -191,7 +191,7 @@ pm2 delete all
 
 ## Next Steps
 
-- **[README.md](README.md)** - Full documentation
+- **[README.md](../README.md)** - Full documentation
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture
 - **[DOTS_OCR_SETUP.md](DOTS_OCR_SETUP.md)** - Detailed dots.ocr setup
 

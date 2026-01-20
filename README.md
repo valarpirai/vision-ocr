@@ -42,9 +42,16 @@ A web application for uploading documents and processing them with dots.ocr for 
 │   │   ├── types/        # TypeScript types
 │   │   └── App.tsx       # Main app component
 │   └── package.json      # Node dependencies
+├── docs/
+│   ├── QUICKSTART.md     # Quick start guide
+│   ├── ARCHITECTURE.md   # System architecture
+│   ├── DOTS_OCR_SETUP.md # dots.ocr setup guide
+│   └── plans/            # Design documentation
 ├── docker-compose.yml    # Docker Compose configuration
 ├── Dockerfile            # Backend container image
 ├── ecosystem.config.js   # PM2 configuration
+├── start.sh              # Startup script
+├── test_integration.py   # Integration tests
 └── README.md
 ```
 
@@ -56,7 +63,7 @@ A web application for uploading documents and processing them with dots.ocr for 
 - Node.js 18+ with npm
 - PM2 (`npm install -g pm2`) for local development
 - Docker and Docker Compose for production deployment
-- **dots.ocr vLLM server** (see [DOTS_OCR_SETUP.md](DOTS_OCR_SETUP.md) for detailed instructions)
+- **dots.ocr vLLM server** (see [docs/DOTS_OCR_SETUP.md](docs/DOTS_OCR_SETUP.md) for detailed instructions)
 
 ### Local Development (SQLite)
 
@@ -82,7 +89,7 @@ A web application for uploading documents and processing them with dots.ocr for 
 
 4. **Setup dots.ocr vLLM Server** (REQUIRED)
 
-   **See [DOTS_OCR_SETUP.md](DOTS_OCR_SETUP.md) for complete setup instructions.**
+   **See [docs/DOTS_OCR_SETUP.md](docs/DOTS_OCR_SETUP.md) for complete setup instructions.**
 
    Quick start:
    ```bash
@@ -216,8 +223,9 @@ Large OCR results are stored efficiently:
 
 ## Documentation
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture, data flows, and deployment patterns
-- **[DOTS_OCR_SETUP.md](DOTS_OCR_SETUP.md)** - Detailed dots.ocr installation and configuration guide
+- **[docs/QUICKSTART.md](docs/QUICKSTART.md)** - Quick start guide (5-minute setup)
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture, data flows, and deployment patterns
+- **[docs/DOTS_OCR_SETUP.md](docs/DOTS_OCR_SETUP.md)** - Detailed dots.ocr installation and configuration guide
 
 ## TODO / Future Enhancements
 
