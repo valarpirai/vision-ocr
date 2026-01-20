@@ -1,16 +1,38 @@
 import os
 import uuid
+import base64
+import json
 from typing import Optional, List
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import Upload, UploadStatus
+from ..models import Upload, UploadStatus, OCRResult
 from ..schemas import UploadResponse, UploadDetail, StatusResponse
 from ..config import settings
 
 router = APIRouter()
 
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".pdf", ".tiff", ".tif"}
+
+
+def reconstruct_ocr_result(upload_id: str, db: Session) -> dict:
+    """Reconstruct OCR result from chunks."""
+    chunks = db.query(OCRResult).filter(
+        OCRResult.upload_id == upload_id
+    ).order_by(OCRResult.chunk_order).all()
+
+    if not chunks:
+        raise HTTPException(status_code=404, detail="OCR result not found")
+
+    # Concatenate chunks
+    encoded_data = "".join(chunk.chunk_data for chunk in chunks)
+
+    # Decode from base64
+    decoded_data = base64.b64decode(encoded_data).decode("utf-8")
+
+    # Parse JSON
+    return json.loads(decoded_data)
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -78,3 +100,61 @@ def get_upload_status(upload_id: str, db: Session = Depends(get_db)):
     if not upload:
         raise HTTPException(status_code=404, detail="Upload not found")
     return StatusResponse(status=upload.status)
+
+
+@router.get("/uploads/{upload_id}/result")
+def get_upload_result(upload_id: str, db: Session = Depends(get_db)):
+    """Get reconstructed OCR result as JSON."""
+    upload = db.query(Upload).filter(Upload.id == upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    if upload.status != UploadStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="OCR processing not completed")
+
+    result = reconstruct_ocr_result(upload_id, db)
+    return result
+
+
+@router.get("/uploads/{upload_id}/export/markdown")
+def export_markdown(upload_id: str, db: Session = Depends(get_db)):
+    """Export OCR result as Markdown file."""
+    upload = db.query(Upload).filter(Upload.id == upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    if upload.status != UploadStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="OCR processing not completed")
+
+    result = reconstruct_ocr_result(upload_id, db)
+
+    # Extract markdown content from result
+    # This assumes dots.ocr returns markdown in a specific field
+    markdown_content = result.get("markdown", json.dumps(result, indent=2))
+
+    filename = f"{os.path.splitext(upload.filename)[0]}.md"
+    return Response(
+        content=markdown_content,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@router.get("/uploads/{upload_id}/export/json")
+def export_json(upload_id: str, db: Session = Depends(get_db)):
+    """Export OCR result as JSON file."""
+    upload = db.query(Upload).filter(Upload.id == upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    if upload.status != UploadStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="OCR processing not completed")
+
+    result = reconstruct_ocr_result(upload_id, db)
+
+    filename = f"{os.path.splitext(upload.filename)[0]}.json"
+    return Response(
+        content=json.dumps(result, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
