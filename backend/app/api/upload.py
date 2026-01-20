@@ -110,7 +110,7 @@ def get_upload_result(upload_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Upload not found")
 
     if upload.status != UploadStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="OCR processing not completed")
+        raise HTTPException(status_code=400, detail="OCR running")
 
     result = reconstruct_ocr_result(upload_id, db)
     return result
@@ -124,7 +124,7 @@ def export_markdown(upload_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Upload not found")
 
     if upload.status != UploadStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="OCR processing not completed")
+        raise HTTPException(status_code=400, detail="OCR running")
 
     result = reconstruct_ocr_result(upload_id, db)
 
@@ -148,7 +148,7 @@ def export_json(upload_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Upload not found")
 
     if upload.status != UploadStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="OCR processing not completed")
+        raise HTTPException(status_code=400, detail="OCR running")
 
     result = reconstruct_ocr_result(upload_id, db)
 
