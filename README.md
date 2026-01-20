@@ -56,6 +56,7 @@ A web application for uploading documents and processing them with dots.ocr for 
 - Node.js 18+ with npm
 - PM2 (`npm install -g pm2`) for local development
 - Docker and Docker Compose for production deployment
+- **dots.ocr vLLM server** (see [DOTS_OCR_SETUP.md](DOTS_OCR_SETUP.md) for detailed instructions)
 
 ### Local Development (SQLite)
 
@@ -79,9 +80,23 @@ A web application for uploading documents and processing them with dots.ocr for 
    npm install
    ```
 
-4. **Install dots.ocr** (if not already installed)
+4. **Setup dots.ocr vLLM Server** (REQUIRED)
+
+   **See [DOTS_OCR_SETUP.md](DOTS_OCR_SETUP.md) for complete setup instructions.**
+
+   Quick start:
    ```bash
-   # Follow instructions at https://github.com/rednote-hilab/dots.ocr
+   # In a separate terminal
+   conda create -n dots_ocr python=3.12
+   conda activate dots_ocr
+   git clone https://github.com/rednote-hilab/dots.ocr.git
+   cd dots.ocr
+   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+   pip install -e .
+   python3 tools/download_model.py
+
+   # Start vLLM server (port 8001 to avoid conflict with backend)
+   vllm serve rednote-hilab/dots.ocr --trust-remote-code --async-scheduling --port 8001
    ```
 
 5. **Start all services with PM2**
@@ -190,15 +205,24 @@ Large OCR results are stored efficiently:
 - `WORKER_POLL_INTERVAL` - Seconds between worker polls (default: `5`)
 - `WORKER_TIMEOUT` - Max OCR processing time in seconds (default: `300`)
 - `MAX_FILE_SIZE` - Upload size limit in bytes (default: `52428800` = 50MB)
+- `DOTS_OCR_URL` - dots.ocr vLLM API URL (default: `http://localhost:8001/v1/chat/completions`)
+- `DOTS_OCR_MODEL` - Model name (default: `rednote-hilab/dots.ocr`)
+- `DOTS_OCR_PROMPT_MODE` - Prompt mode (default: `prompt_layout_all_en`)
 
 **Docker Compose (`.env`)**:
 - `POSTGRES_USER` - PostgreSQL username
 - `POSTGRES_PASSWORD` - PostgreSQL password
 - `POSTGRES_DB` - PostgreSQL database name
 
+## Documentation
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture, data flows, and deployment patterns
+- **[DOTS_OCR_SETUP.md](DOTS_OCR_SETUP.md)** - Detailed dots.ocr installation and configuration guide
+
 ## TODO / Future Enhancements
 
-- [ ] Integrate actual dots.ocr library (currently uses mock implementation)
+- [x] Integrate actual dots.ocr library
+- [x] Support multi-page PDFs
 - [ ] Add user authentication
 - [ ] Implement image/PDF preview in split view
 - [ ] Add batch upload support
