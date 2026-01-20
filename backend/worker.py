@@ -3,6 +3,11 @@ import base64
 import json
 import os
 from datetime import datetime
+from io import BytesIO
+from typing import List
+import requests
+from PIL import Image
+from pdf2image import convert_from_path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.database import SessionLocal, engine
@@ -13,37 +18,108 @@ from app.config import settings
 CHUNK_SIZE = 1024  # bytes
 
 
-def process_with_dots_ocr(file_path: str) -> dict:
-    """
-    Process file with dots.ocr and return structured result.
+def encode_image_to_base64(image: Image.Image) -> str:
+    """Convert PIL Image to base64 string."""
+    buffered = BytesIO()
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-    TODO: Integrate actual dots.ocr library here.
-    For now, returns a mock result.
-    """
-    # Mock implementation - replace with actual dots.ocr call
-    mock_result = {
-        "file": file_path,
-        "pages": [
+
+def load_images_from_file(file_path: str) -> List[Image.Image]:
+    """Load images from file (supports images and PDFs)."""
+    ext = os.path.splitext(file_path)[1].lower()
+
+    if ext == ".pdf":
+        # Convert PDF to images
+        images = convert_from_path(file_path)
+        return images
+    else:
+        # Load single image
+        image = Image.open(file_path)
+        return [image]
+
+
+def call_dots_ocr_api(image_base64: str, page_number: int) -> dict:
+    """Call dots.ocr vLLM API for a single image."""
+    payload = {
+        "model": settings.dots_ocr_model,
+        "messages": [
             {
-                "page_number": 1,
-                "text": "Sample OCR text extracted from document",
-                "markdown": "# Sample Document\n\nThis is extracted text.",
-                "elements": [
-                    {"type": "text", "content": "Sample text", "bbox": [0, 0, 100, 20]},
-                    {"type": "heading", "content": "Sample Heading", "bbox": [0, 30, 200, 50]}
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{image_base64}"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": settings.dots_ocr_prompt_mode
+                    }
                 ]
             }
         ],
+        "max_tokens": 4096,
+        "temperature": 0
+    }
+
+    try:
+        response = requests.post(
+            settings.dots_ocr_url,
+            json=payload,
+            timeout=settings.worker_timeout
+        )
+        response.raise_for_status()
+
+        result = response.json()
+
+        # Extract content from vLLM response
+        content = result["choices"][0]["message"]["content"]
+
+        return {
+            "page_number": page_number,
+            "content": content,
+            "raw_response": result
+        }
+
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"dots.ocr API error: {str(e)}")
+
+
+def process_with_dots_ocr(file_path: str) -> dict:
+    """
+    Process file with dots.ocr and return structured result.
+    """
+    start_time = time.time()
+
+    # Load images from file
+    images = load_images_from_file(file_path)
+
+    # Process each page
+    pages = []
+    for idx, image in enumerate(images, start=1):
+        print(f"Processing page {idx}/{len(images)}...")
+
+        # Encode image
+        image_base64 = encode_image_to_base64(image)
+
+        # Call API
+        page_result = call_dots_ocr_api(image_base64, idx)
+        pages.append(page_result)
+
+    processing_time = time.time() - start_time
+
+    result = {
+        "file": file_path,
+        "pages": pages,
         "metadata": {
-            "total_pages": 1,
-            "processing_time": 1.5
+            "total_pages": len(pages),
+            "processing_time": processing_time
         }
     }
 
-    # Simulate processing time
-    time.sleep(2)
-
-    return mock_result
+    return result
 
 
 def chunk_and_store_result(upload_id: str, result: dict, db: Session):

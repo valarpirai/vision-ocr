@@ -128,9 +128,17 @@ def export_markdown(upload_id: str, db: Session = Depends(get_db)):
 
     result = reconstruct_ocr_result(upload_id, db)
 
-    # Extract markdown content from result
-    # This assumes dots.ocr returns markdown in a specific field
-    markdown_content = result.get("markdown", json.dumps(result, indent=2))
+    # Extract markdown content from all pages
+    pages = result.get("pages", [])
+    if pages:
+        # Concatenate content from all pages
+        markdown_content = "\n\n---\n\n".join(
+            f"# Page {page.get('page_number', i+1)}\n\n{page.get('content', '')}"
+            for i, page in enumerate(pages)
+        )
+    else:
+        # Fallback to raw JSON if no pages found
+        markdown_content = json.dumps(result, indent=2)
 
     filename = f"{os.path.splitext(upload.filename)[0]}.md"
     return Response(

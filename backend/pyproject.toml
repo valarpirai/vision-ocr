@@ -11,6 +11,9 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "psycopg2-binary>=2.9.9",
     "pydantic-settings>=2.0.0",
+    "requests>=2.31.0",
+    "pillow>=10.0.0",
+    "pdf2image>=1.16.0",
 ]
 
 [build-system]
