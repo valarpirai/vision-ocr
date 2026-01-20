@@ -1,1 +1,164 @@
+# Worktrees
 .worktrees/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env.local
+backend/.venv/
+
+# PyInstaller
+*.pyc
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+frontend/node_modules/
+
+# Build outputs
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/out/
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+app.db
+backend/app.db
+
+# Uploads directory
+uploads/
+backend/uploads/
+*/uploads/
+
+# Logs
+*.log
+logs/
+*.log.*
+pm2.log
+pm2-error.log
+
+# PM2
+.pm2/
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.temp/
+
+# Lock files (keep uv.lock and package-lock.json in git)
+# But ignore other lock files
+.lock
+
+# Docker
+.dockerignore
+
+# Certificates and keys
+*.pem
+*.key
+*.cert
+*.crt
+
+# Environment-specific
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Backend specific
+backend/alembic/versions/*.pyc
+backend/.pytest_cache/
+
+# Frontend specific
+frontend/.vite/
+frontend/.turbo/
+frontend/.vercel/
+
+# Model weights (if stored locally)
+*.pth
+*.ckpt
+*.safetensors
+models/
+checkpoints/
