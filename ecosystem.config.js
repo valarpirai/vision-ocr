@@ -3,7 +3,7 @@ module.exports = {
     {
       name: "backend",
       cwd: "./backend",
-      script: "~/.local/bin/uv",
+      script: "/Users/valarpirai.annadurai/.local/bin/uv",
       args: "run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
       env: {
         DATABASE_URL: "sqlite:///./app.db",
@@ -16,7 +16,7 @@ module.exports = {
     {
       name: "worker",
       cwd: "./backend",
-      script: "~/.local/bin/uv",
+      script: "/Users/valarpirai.annadurai/.local/bin/uv",
       args: "run python worker.py",
       instances: 3,
       env: {
@@ -29,8 +29,8 @@ module.exports = {
     {
       name: "frontend",
       cwd: "./frontend",
-      script: "npm",
-      args: "run dev",
+      script: "./node_modules/.bin/vite",
+      interpreter: "/Users/valarpirai.annadurai/.nvm/versions/node/v22.22.0/bin/node",
     },
   ],
 };

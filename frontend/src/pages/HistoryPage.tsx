@@ -1,19 +1,19 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { getUploads, getUpload, getUploadResult, downloadMarkdown, downloadJSON } from "../api/client";
-import { UploadListItem, Upload, UploadStatus } from "../types";
+import type { UploadListItem, Upload } from "../types";
+import { UploadStatus } from "../types";
 
 export default function HistoryPage() {
   const [uploads, setUploads] = useState<UploadListItem[]>([]);
   const [selectedUpload, setSelectedUpload] = useState<Upload | null>(null);
-  const [ocrResult, setOcrResult] = useState<any>(null);
+  const [ocrResult, setOcrResult] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
   const [resultLoading, setResultLoading] = useState(false);
-  const navigate = useNavigate();
+  const [showSidebar, setShowSidebar] = useState(false);
 
   useEffect(() => {
     loadUploads();
-    const interval = setInterval(loadUploads, 3000); // Poll every 3 seconds
+    const interval = setInterval(loadUploads, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -33,6 +33,7 @@ export default function HistoryPage() {
       const upload = await getUpload(uploadId);
       setSelectedUpload(upload);
       setOcrResult(null);
+      setShowSidebar(false); // Close sidebar on mobile after selection
 
       if (upload.status === UploadStatus.COMPLETED) {
         setResultLoading(true);
@@ -45,195 +46,189 @@ export default function HistoryPage() {
     }
   };
 
-  const getStatusColor = (status: UploadStatus) => {
+  const getStatusColorClass = (status: UploadStatus) => {
     switch (status) {
       case UploadStatus.COMPLETED:
-        return "#4CAF50";
+        return "bg-green-600";
       case UploadStatus.PROCESSING:
-        return "#FF9800";
+        return "bg-orange-500";
       case UploadStatus.PENDING:
-        return "#2196F3";
+        return "bg-blue-500";
       case UploadStatus.FAILED:
-        return "#F44336";
+        return "bg-red-600";
       default:
-        return "#666";
+        return "bg-gray-600";
     }
   };
 
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
+    <div className="flex h-full relative">
+      {/* Mobile menu button */}
+      <button
+        onClick={() => setShowSidebar(!showSidebar)}
+        className="lg:hidden fixed bottom-4 left-4 z-50 bg-green-600 text-white p-3 rounded-full shadow-lg hover:bg-green-700 transition-colors"
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {/* Overlay for mobile */}
+      {showSidebar && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+
       {/* Left Sidebar - Upload List */}
       <div
-        style={{
-          width: "300px",
-          borderRight: "1px solid #ccc",
-          overflowY: "auto",
-          padding: "20px",
-        }}
+        className={`${
+          showSidebar ? "translate-x-0" : "-translate-x-full"
+        } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-40 w-80 border-r border-gray-200 overflow-y-auto p-4 sm:p-6 bg-white transition-transform duration-300`}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-          <h2>Upload History</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Uploads</h2>
           <button
-            onClick={() => navigate("/")}
-            style={{
-              padding: "8px 16px",
-              fontSize: "14px",
-              backgroundColor: "#4CAF50",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-            }}
+            onClick={() => setShowSidebar(false)}
+            className="lg:hidden text-gray-500 hover:text-gray-700"
           >
-            New Upload
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
 
         {loading ? (
-          <p>Loading...</p>
+          <p className="text-gray-600">Loading...</p>
         ) : uploads.length === 0 ? (
-          <p>No uploads yet</p>
+          <p className="text-gray-600">No uploads yet</p>
         ) : (
-          uploads.map((upload) => (
-            <div
-              key={upload.id}
-              onClick={() => handleSelectUpload(upload.id)}
-              style={{
-                padding: "12px",
-                marginBottom: "10px",
-                border: `2px solid ${
-                  selectedUpload?.id === upload.id ? "#4CAF50" : "#eee"
-                }`,
-                borderRadius: "4px",
-                cursor: "pointer",
-                backgroundColor: "#fafafa",
-              }}
-            >
-              <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
-                {upload.filename}
-              </div>
-              <div style={{ fontSize: "0.9em", color: "#666" }}>
-                {new Date(upload.uploaded_at).toLocaleString()}
-              </div>
+          <div className="space-y-3">
+            {uploads.map((upload) => (
               <div
-                style={{
-                  marginTop: "4px",
-                  padding: "4px 8px",
-                  display: "inline-block",
-                  borderRadius: "4px",
-                  fontSize: "0.85em",
-                  color: "white",
-                  backgroundColor: getStatusColor(upload.status),
-                }}
+                key={upload.id}
+                onClick={() => handleSelectUpload(upload.id)}
+                className={`p-4 rounded-lg cursor-pointer transition-all duration-200 ${
+                  selectedUpload?.id === upload.id
+                    ? "border-2 border-green-600 bg-green-50"
+                    : "border-2 border-gray-200 bg-gray-50 hover:border-green-300"
+                }`}
               >
-                {upload.status}
+                <div className="font-semibold text-gray-800 mb-2 break-words">
+                  {upload.filename}
+                </div>
+                <div className="text-sm text-gray-600 mb-2">
+                  {new Date(upload.uploaded_at).toLocaleString()}
+                </div>
+                <span
+                  className={`inline-block px-3 py-1 rounded text-xs font-medium text-white ${getStatusColorClass(
+                    upload.status
+                  )}`}
+                >
+                  {upload.status}
+                </span>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Right Panel - Split View */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      {/* Right Panel - Details View */}
+      <div className="flex-1 flex flex-col bg-white overflow-hidden">
         {selectedUpload ? (
           <>
             {/* Header with export buttons */}
-            <div
-              style={{
-                padding: "20px",
-                borderBottom: "1px solid #ccc",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <h3>{selectedUpload.filename}</h3>
+            <div className="border-b border-gray-200 p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-800 break-words">
+                {selectedUpload.filename}
+              </h3>
               {selectedUpload.status === UploadStatus.COMPLETED && (
-                <div>
+                <div className="flex flex-wrap gap-2">
                   <a
                     href={downloadMarkdown(selectedUpload.id)}
                     download
-                    style={{
-                      marginRight: "10px",
-                      padding: "8px 16px",
-                      backgroundColor: "#2196F3",
-                      color: "white",
-                      textDecoration: "none",
-                      borderRadius: "4px",
-                    }}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
                   >
-                    Download Markdown
+                    📄 Markdown
                   </a>
                   <a
                     href={downloadJSON(selectedUpload.id)}
                     download
-                    style={{
-                      padding: "8px 16px",
-                      backgroundColor: "#4CAF50",
-                      color: "white",
-                      textDecoration: "none",
-                      borderRadius: "4px",
-                    }}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
                   >
-                    Download JSON
+                    📊 JSON
                   </a>
                 </div>
               )}
             </div>
 
             {/* Split View */}
-            <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
               {/* Left: Original File Preview */}
-              <div
-                style={{
-                  flex: 1,
-                  padding: "20px",
-                  overflowY: "auto",
-                  borderRight: "1px solid #ccc",
-                }}
-              >
-                <h4>Original File</h4>
-                <p>File: {selectedUpload.filename}</p>
-                <p>Size: {(selectedUpload.file_size / 1024).toFixed(2)} KB</p>
-                <p>Type: {selectedUpload.mime_type}</p>
-                {selectedUpload.mime_type.startsWith("image/") && (
-                  <p style={{ color: "#666", fontSize: "0.9em" }}>
-                    Image preview not yet implemented
+              <div className="flex-1 p-4 sm:p-6 overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-200">
+                <h4 className="text-lg font-bold text-gray-800 mb-4">Original File</h4>
+                <div className="space-y-2 text-sm sm:text-base">
+                  <p className="text-gray-700">
+                    <span className="font-semibold">File:</span> {selectedUpload.filename}
                   </p>
-                )}
+                  <p className="text-gray-700">
+                    <span className="font-semibold">Size:</span>{" "}
+                    {(selectedUpload.file_size / 1024).toFixed(2)} KB
+                  </p>
+                  <p className="text-gray-700">
+                    <span className="font-semibold">Type:</span> {selectedUpload.mime_type}
+                  </p>
+                  {selectedUpload.mime_type.startsWith("image/") && (
+                    <p className="text-gray-500 text-sm mt-4">
+                      Image preview not yet implemented
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Right: OCR Result */}
-              <div style={{ flex: 1, padding: "20px", overflowY: "auto" }}>
-                <h4>OCR Result</h4>
+              <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-gray-50">
+                <h4 className="text-lg font-bold text-gray-800 mb-4">OCR Result</h4>
                 {selectedUpload.status === UploadStatus.PENDING && (
-                  <p>Waiting to be processed...</p>
+                  <p className="text-gray-600">Waiting to be processed...</p>
                 )}
                 {selectedUpload.status === UploadStatus.PROCESSING && (
-                  <p>OCR running...</p>
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    OCR running...
+                  </div>
                 )}
                 {selectedUpload.status === UploadStatus.FAILED && (
-                  <p style={{ color: "red" }}>
+                  <p className="text-red-600">
                     Processing failed: {selectedUpload.error_message}
                   </p>
                 )}
                 {selectedUpload.status === UploadStatus.COMPLETED && (
                   <>
                     {resultLoading ? (
-                      <p>Loading result...</p>
+                      <p className="text-gray-600">Loading result...</p>
                     ) : ocrResult ? (
-                      <pre
-                        style={{
-                          backgroundColor: "#f5f5f5",
-                          padding: "15px",
-                          borderRadius: "4px",
-                          overflow: "auto",
-                        }}
-                      >
+                      <pre className="bg-white p-4 rounded-lg overflow-auto text-xs sm:text-sm border border-gray-200">
                         {JSON.stringify(ocrResult, null, 2)}
                       </pre>
                     ) : (
-                      <p>No result data</p>
+                      <p className="text-gray-600">No result data</p>
                     )}
                   </>
                 )}
@@ -241,16 +236,11 @@ export default function HistoryPage() {
             </div>
           </>
         ) : (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              color: "#666",
-            }}
-          >
-            Select an upload to view details
+          <div className="flex-1 flex items-center justify-center text-gray-500 p-4 text-center">
+            <div>
+              <div className="text-5xl mb-4">📋</div>
+              <p className="text-lg">Select an upload to view details</p>
+            </div>
           </div>
         )}
       </div>

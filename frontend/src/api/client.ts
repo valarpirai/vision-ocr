@@ -1,5 +1,5 @@
 import axios from "axios";
-import { Upload, UploadListItem, StatusResponse } from "../types";
+import type { Upload, UploadListItem, StatusResponse } from "../types";
 
 const API_BASE_URL = "http://localhost:8000/api";
 
@@ -25,7 +25,7 @@ export const getUploads = async (
   limit = 50,
   status?: string
 ): Promise<UploadListItem[]> => {
-  const params: any = { skip, limit };
+  const params: { skip: number; limit: number; status?: string } = { skip, limit };
   if (status) params.status = status;
 
   const response = await api.get("/uploads", { params });
@@ -44,7 +44,7 @@ export const getUploadStatus = async (
   return response.data;
 };
 
-export const getUploadResult = async (uploadId: string): Promise<any> => {
+export const getUploadResult = async (uploadId: string): Promise<unknown> => {
   const response = await api.get(`/uploads/${uploadId}/result`);
   return response.data;
 };

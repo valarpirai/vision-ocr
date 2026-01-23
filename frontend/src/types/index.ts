@@ -1,9 +1,11 @@
-export enum UploadStatus {
-  PENDING = "pending",
-  PROCESSING = "processing",
-  COMPLETED = "completed",
-  FAILED = "failed",
-}
+export const UploadStatus = {
+  PENDING: "pending",
+  PROCESSING: "processing",
+  COMPLETED: "completed",
+  FAILED: "failed",
+} as const;
+
+export type UploadStatus = (typeof UploadStatus)[keyof typeof UploadStatus];
 
 export interface Upload {
   id: string;
