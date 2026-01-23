@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getUploads, getUpload, getUploadResult, downloadMarkdown, downloadJSON } from "../api/client";
+import { getUploads, getUpload, getUploadResult, downloadMarkdown, downloadJSON, getFileUrl, retryUpload } from "../api/client";
 import type { UploadListItem, Upload } from "../types";
 import { UploadStatus } from "../types";
 
@@ -10,6 +10,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [resultLoading, setResultLoading] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     loadUploads();
@@ -43,6 +44,28 @@ export default function HistoryPage() {
       }
     } catch (err) {
       console.error("Failed to load upload details:", err);
+    }
+  };
+
+  const handleRetry = async (uploadId: string) => {
+    setRetrying(true);
+    try {
+      const updatedUpload = await retryUpload(uploadId);
+      setSelectedUpload(updatedUpload);
+
+      // Refresh the uploads list
+      await loadUploads();
+
+      // Show success message (you can use a toast library for better UX)
+      alert("Upload queued for retry. Processing will begin shortly.");
+    } catch (err) {
+      console.error("Failed to retry upload:", err);
+      const errorMessage = err instanceof Error && 'response' in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : "Failed to retry upload";
+      alert(errorMessage || "Failed to retry upload");
+    } finally {
+      setRetrying(false);
     }
   };
 
@@ -143,24 +166,61 @@ export default function HistoryPage() {
               <h3 className="text-lg sm:text-xl font-bold text-gray-800 break-words">
                 {selectedUpload.filename}
               </h3>
-              {selectedUpload.status === UploadStatus.COMPLETED && (
-                <div className="flex flex-wrap gap-2">
-                  <a
-                    href={downloadMarkdown(selectedUpload.id)}
-                    download
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+              <div className="flex flex-wrap gap-2">
+                {selectedUpload.status === UploadStatus.COMPLETED && (
+                  <>
+                    <a
+                      href={downloadMarkdown(selectedUpload.id)}
+                      download
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      📄 Markdown
+                    </a>
+                    <a
+                      href={downloadJSON(selectedUpload.id)}
+                      download
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      📊 JSON
+                    </a>
+                  </>
+                )}
+                {selectedUpload.status === UploadStatus.FAILED && (
+                  <button
+                    onClick={() => handleRetry(selectedUpload.id)}
+                    disabled={retrying}
+                    className={`px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors ${
+                      retrying
+                        ? "bg-gray-400 cursor-not-allowed"
+                        : "bg-orange-600 hover:bg-orange-700"
+                    }`}
                   >
-                    📄 Markdown
-                  </a>
-                  <a
-                    href={downloadJSON(selectedUpload.id)}
-                    download
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
-                  >
-                    📊 JSON
-                  </a>
-                </div>
-              )}
+                    {retrying ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        Retrying...
+                      </span>
+                    ) : (
+                      <>🔄 Retry Processing</>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Split View */}
@@ -168,22 +228,76 @@ export default function HistoryPage() {
               {/* Left: Original File Preview */}
               <div className="flex-1 p-4 sm:p-6 overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-200">
                 <h4 className="text-lg font-bold text-gray-800 mb-4">Original File</h4>
-                <div className="space-y-2 text-sm sm:text-base">
-                  <p className="text-gray-700">
-                    <span className="font-semibold">File:</span> {selectedUpload.filename}
-                  </p>
-                  <p className="text-gray-700">
-                    <span className="font-semibold">Size:</span>{" "}
-                    {(selectedUpload.file_size / 1024).toFixed(2)} KB
-                  </p>
-                  <p className="text-gray-700">
-                    <span className="font-semibold">Type:</span> {selectedUpload.mime_type}
-                  </p>
-                  {selectedUpload.mime_type.startsWith("image/") && (
-                    <p className="text-gray-500 text-sm mt-4">
-                      Image preview not yet implemented
+                <div className="space-y-4">
+                  <div className="space-y-2 text-sm sm:text-base">
+                    <p className="text-gray-700">
+                      <span className="font-semibold">File:</span> {selectedUpload.filename}
                     </p>
-                  )}
+                    <p className="text-gray-700">
+                      <span className="font-semibold">Size:</span>{" "}
+                      {(selectedUpload.file_size / 1024).toFixed(2)} KB
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-semibold">Type:</span> {selectedUpload.mime_type}
+                    </p>
+                  </div>
+
+                  {/* File Preview */}
+                  <div className="mt-4">
+                    {selectedUpload.mime_type.startsWith("image/") && (
+                      <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                        <img
+                          src={getFileUrl(selectedUpload.id)}
+                          alt={selectedUpload.filename}
+                          className="w-full h-auto max-h-[600px] object-contain"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = '<div class="p-8 text-center text-gray-500"><p>Failed to load image preview</p></div>';
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {selectedUpload.mime_type === "application/pdf" && (
+                      <div className="p-8 text-center border border-gray-200 rounded-lg bg-gray-50">
+                        <svg className="w-16 h-16 mx-auto mb-4 text-red-600" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" />
+                          <path d="M14 2v6h6M9 13h6M9 17h6M9 9h1" />
+                        </svg>
+                        <p className="text-gray-700 mb-4 font-medium">PDF Document</p>
+                        <a
+                          href={getFileUrl(selectedUpload.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          Open PDF in new tab
+                        </a>
+                      </div>
+                    )}
+
+                    {!selectedUpload.mime_type.startsWith("image/") &&
+                     selectedUpload.mime_type !== "application/pdf" && (
+                      <div className="p-8 text-center text-gray-500 border border-gray-200 rounded-lg">
+                        <p>Preview not available for this file type</p>
+                        <a
+                          href={getFileUrl(selectedUpload.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-700 underline mt-2 inline-block"
+                        >
+                          Download file
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -215,9 +329,52 @@ export default function HistoryPage() {
                   </div>
                 )}
                 {selectedUpload.status === UploadStatus.FAILED && (
-                  <p className="text-red-600">
-                    Processing failed: {selectedUpload.error_message}
-                  </p>
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <svg className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div className="flex-1">
+                        <h5 className="text-red-800 font-semibold mb-1">Processing Failed</h5>
+                        <p className="text-red-700 text-sm mb-3">
+                          {selectedUpload.error_message || "An error occurred during processing"}
+                        </p>
+                        <button
+                          onClick={() => handleRetry(selectedUpload.id)}
+                          disabled={retrying}
+                          className={`px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors ${
+                            retrying
+                              ? "bg-gray-400 cursor-not-allowed"
+                              : "bg-orange-600 hover:bg-orange-700"
+                          }`}
+                        >
+                          {retrying ? (
+                            <span className="flex items-center gap-2">
+                              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                  fill="none"
+                                />
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                />
+                              </svg>
+                              Retrying...
+                            </span>
+                          ) : (
+                            <>🔄 Retry Processing</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 )}
                 {selectedUpload.status === UploadStatus.COMPLETED && (
                   <>

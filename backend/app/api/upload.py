@@ -3,8 +3,9 @@ import uuid
 import base64
 import json
 from typing import Optional, List
+from urllib.parse import quote
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Upload, UploadStatus, OCRResult
@@ -100,6 +101,68 @@ def get_upload_status(upload_id: str, db: Session = Depends(get_db)):
     if not upload:
         raise HTTPException(status_code=404, detail="Upload not found")
     return StatusResponse(status=upload.status)
+
+
+@router.get("/uploads/{upload_id}/file")
+def get_upload_file(upload_id: str, db: Session = Depends(get_db)):
+    """Serve the uploaded file."""
+    upload = db.query(Upload).filter(Upload.id == upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    if not os.path.exists(upload.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    # Determine media type
+    media_type = upload.mime_type or "application/octet-stream"
+
+    # Sanitize filename for HTTP header (ASCII-safe)
+    # Replace non-ASCII characters with underscores
+    safe_filename = upload.filename.encode('ascii', 'ignore').decode('ascii')
+    if not safe_filename:
+        safe_filename = "file" + os.path.splitext(upload.filename)[1]
+
+    # For PDFs and images, serve inline (opens in browser)
+    # For other files, serve as attachment (triggers download)
+    if media_type == "application/pdf" or media_type.startswith("image/"):
+        return FileResponse(
+            path=upload.file_path,
+            media_type=media_type,
+            headers={"Content-Disposition": f'inline; filename="{safe_filename}"'}
+        )
+    else:
+        return FileResponse(
+            path=upload.file_path,
+            media_type=media_type,
+            filename=safe_filename
+        )
+
+
+@router.post("/uploads/{upload_id}/retry")
+def retry_upload(upload_id: str, db: Session = Depends(get_db)):
+    """Retry processing for a failed upload."""
+    upload = db.query(Upload).filter(Upload.id == upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    if upload.status == UploadStatus.PROCESSING:
+        raise HTTPException(status_code=400, detail="Upload is already processing")
+
+    if upload.status == UploadStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Upload already completed")
+
+    # Reset status to pending and clear error message
+    upload.status = UploadStatus.PENDING
+    upload.error_message = None
+    upload.processed_at = None
+
+    # Delete existing OCR result chunks if any
+    db.query(OCRResult).filter(OCRResult.upload_id == upload_id).delete()
+
+    db.commit()
+    db.refresh(upload)
+
+    return {"message": "Upload queued for retry", "upload": upload}
 
 
 @router.get("/uploads/{upload_id}/result")

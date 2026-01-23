@@ -56,3 +56,12 @@ export const downloadMarkdown = (uploadId: string): string => {
 export const downloadJSON = (uploadId: string): string => {
   return `${API_BASE_URL}/uploads/${uploadId}/export/json`;
 };
+
+export const getFileUrl = (uploadId: string): string => {
+  return `${API_BASE_URL}/uploads/${uploadId}/file`;
+};
+
+export const retryUpload = async (uploadId: string): Promise<Upload> => {
+  const response = await api.post(`/uploads/${uploadId}/retry`);
+  return response.data.upload;
+};
