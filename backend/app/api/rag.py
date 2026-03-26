@@ -156,13 +156,16 @@ def ask_question(
         for msg in prior_messages
     ]
 
-    # Retrieve relevant chunks
+    # Rewrite follow-up questions into standalone questions for better retrieval
+    retrieval_query = llm.rewrite_query(request.question, history)
+
+    # Retrieve relevant chunks using the (possibly rewritten) query
     try:
-        chunks = retriever.search(request.question, request.upload_ids)
+        chunks = retriever.search(retrieval_query, request.upload_ids)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    # Generate answer
+    # Generate answer using the original question (not the rewritten one)
     try:
         answer = llm.generate_answer(request.question, chunks, history)
     except RuntimeError as e:

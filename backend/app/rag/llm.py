@@ -23,6 +23,53 @@ def build_system_prompt(chunks: List[Dict[str, Any]]) -> str:
     )
 
 
+def rewrite_query(question: str, conversation_history: List[Dict[str, str]]) -> str:
+    """
+    Rewrite a follow-up question into a standalone question using conversation history.
+
+    Example:
+      history:  User: "What is the invoice total?"  Assistant: "$1,700"
+      question: "What about the tax?"
+      rewritten: "What is the tax amount on the invoice?"
+
+    If there is no history, returns the original question unchanged.
+    Falls back to the original question on any Ollama error.
+    """
+    if not conversation_history:
+        return question
+
+    history_text = "\n".join(
+        f"{msg['role'].capitalize()}: {msg['content']}"
+        for msg in conversation_history[-6:]  # last 3 turns is enough context
+    )
+
+    prompt = (
+        "Given the conversation history below, rewrite the follow-up question "
+        "as a complete, standalone question that can be understood without the history. "
+        "Output ONLY the rewritten question — no explanation, no quotes.\n\n"
+        f"Conversation history:\n{history_text}\n\n"
+        f"Follow-up question: {question}\n\n"
+        "Standalone question:"
+    )
+
+    try:
+        response = requests.post(
+            f"{settings.ollama_base_url}/api/chat",
+            json={
+                "model": settings.ollama_llm_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False,
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        rewritten = response.json()["message"]["content"].strip()
+        # Sanity check: if the model returns something too short or empty, use original
+        return rewritten if len(rewritten) > 5 else question
+    except Exception:
+        return question
+
+
 def generate_answer(
     question: str,
     chunks: List[Dict[str, Any]],
