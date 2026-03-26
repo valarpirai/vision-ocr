@@ -3,6 +3,8 @@ from datetime import datetime
 from . import embedder, chroma_client
 from .chunker import chunk_page
 
+MIN_CONTENT_CHARS = 20  # skip pages/chunks with fewer characters than this
+
 
 def index_upload(upload_id: str, filename: str, ocr_result: dict) -> int:
     """
@@ -26,14 +28,16 @@ def index_upload(upload_id: str, filename: str, ocr_result: dict) -> int:
     for page in pages:
         page_number = page.get("page_number", 1)
         content = page.get("content", "").strip()
-        if not content:
-            continue
+        if len(content) < MIN_CONTENT_CHARS:
+            continue  # skip blank or near-empty OCR pages
 
         chunks = chunk_page(content)
         if not chunks:
             continue
 
         for chunk in chunks:
+            if len(chunk.content) < MIN_CONTENT_CHARS:
+                continue  # skip fragments that survived the chunker merge
             doc_id = f"{upload_id}_page_{page_number}_chunk_{chunk.index}"
             embedding = embedder.embed(chunk.content)
 
