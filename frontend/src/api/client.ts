@@ -74,6 +74,10 @@ export const retryUpload = async (uploadId: string): Promise<Upload> => {
   return response.data.upload;
 };
 
+export const deleteUpload = async (uploadId: string): Promise<void> => {
+  await api.delete(`/uploads/${uploadId}`);
+};
+
 // RAG / Search API
 
 export const createConversation = async (): Promise<ConversationListItem> => {
