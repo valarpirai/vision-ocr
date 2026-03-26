@@ -4,6 +4,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 echo "=========================================="
 echo "Vision OCR Application Startup"
 echo "=========================================="
@@ -14,7 +17,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # Check if PM2 is installed
 if ! command -v pm2 &> /dev/null; then
@@ -23,20 +26,48 @@ if ! command -v pm2 &> /dev/null; then
     exit 1
 fi
 
-# Check if backend dependencies are installed
-if [ ! -d "backend/.venv" ]; then
-    echo -e "${YELLOW}Backend dependencies not found. Installing...${NC}"
-    cd backend
-    ~/.local/bin/uv sync
-    cd ..
+# Check if uv is installed
+if ! command -v uv &> /dev/null && [ ! -f "$HOME/.local/bin/uv" ]; then
+    echo -e "${RED}ERROR: uv is not installed${NC}"
+    echo "Install uv with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+fi
+UV="${HOME}/.local/bin/uv"
+[ -x "$(command -v uv)" ] && UV="uv"
+
+# Check if python3.11 is available (required for vllm-env)
+if ! command -v python3.11 &> /dev/null; then
+    echo -e "${RED}ERROR: python3.11 is not installed${NC}"
+    echo "Install with: brew install python@3.11"
+    exit 1
 fi
 
-# Check if frontend dependencies are installed
+# Set up backend virtualenv (via uv)
+if [ ! -d "backend/.venv" ]; then
+    echo -e "${YELLOW}Setting up backend virtualenv...${NC}"
+    cd backend && $UV sync && cd ..
+    echo -e "${GREEN}Backend virtualenv ready.${NC}"
+else
+    echo -e "${GREEN}Backend virtualenv found.${NC}"
+fi
+
+# Set up vllm virtualenv
+if [ ! -d "vllm-env" ]; then
+    echo -e "${YELLOW}Setting up vllm virtualenv...${NC}"
+    python3.11 -m venv vllm-env
+    vllm-env/bin/pip install --quiet vllm
+    echo -e "${GREEN}vllm virtualenv ready.${NC}"
+else
+    echo -e "${GREEN}vllm virtualenv found.${NC}"
+fi
+
+# Set up frontend dependencies
 if [ ! -d "frontend/node_modules" ]; then
-    echo -e "${YELLOW}Frontend dependencies not found. Installing...${NC}"
-    cd frontend
-    npm install
-    cd ..
+    echo -e "${YELLOW}Installing frontend dependencies...${NC}"
+    cd frontend && pnpm install && cd ..
+    echo -e "${GREEN}Frontend dependencies ready.${NC}"
+else
+    echo -e "${GREEN}Frontend dependencies found.${NC}"
 fi
 
 # Create .env if it doesn't exist
@@ -53,7 +84,6 @@ if ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
     echo ""
 else
     echo -e "${GREEN}Ollama is running.${NC}"
-    # Pull required models if not already present
     echo "Checking Ollama models..."
     ollama pull nomic-embed-text 2>/dev/null || true
     ollama pull llama3.2 2>/dev/null || true
@@ -72,16 +102,10 @@ echo "View status: pm2 status"
 echo "Stop all: pm2 stop all"
 echo ""
 echo -e "${BLUE}Application URLs:${NC}"
-echo "  Frontend: http://localhost:5173"
-echo "  Backend:  http://localhost:8000"
-echo "  API Docs: http://localhost:8000/docs"
-echo ""
-echo -e "${YELLOW}IMPORTANT: Make sure dots.ocr vLLM server is running!${NC}"
-echo "Start dots.ocr with:"
-echo "  vllm serve rednote-hilab/dots.ocr --trust-remote-code --async-scheduling --port 8001"
-echo ""
-echo -e "${YELLOW}IMPORTANT: Make sure Ollama is running for RAG search!${NC}"
-echo "Start Ollama with: ollama serve"
+echo "  Frontend:  http://localhost:5173"
+echo "  Backend:   http://localhost:8000"
+echo "  API Docs:  http://localhost:8000/docs"
+echo "  dots.ocr:  http://localhost:8001"
 echo ""
 echo "See docs/DOTS_OCR_SETUP.md for detailed setup instructions."
 echo ""
