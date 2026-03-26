@@ -3,12 +3,25 @@ import requests
 from ..config import settings
 
 
+def _sort_chunks_by_document_order(chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Re-sort retrieved chunks by (filename, page_number, chunk_index).
+    ChromaDB returns chunks ranked by similarity, but LLMs handle context
+    better when passages appear in their natural document order.
+    """
+    return sorted(
+        chunks,
+        key=lambda c: (c["filename"], c["page_number"], c.get("chunk_index", 0)),
+    )
+
+
 def build_system_prompt(chunks: List[Dict[str, Any]]) -> str:
-    if not chunks:
+    ordered = _sort_chunks_by_document_order(chunks)
+    if not ordered:
         context = "No relevant document context found."
     else:
         parts = []
-        for chunk in chunks:
+        for chunk in ordered:
             parts.append(
                 f"[{chunk['filename']}, page {chunk['page_number']}]:\n{chunk['content']}"
             )
