@@ -35,13 +35,6 @@ fi
 UV="${HOME}/.local/bin/uv"
 [ -x "$(command -v uv)" ] && UV="uv"
 
-# Check if python3.11 is available (required for vllm-env)
-if ! command -v python3.11 &> /dev/null; then
-    echo -e "${RED}ERROR: python3.11 is not installed${NC}"
-    echo "Install with: brew install python@3.11"
-    exit 1
-fi
-
 # Set up backend virtualenv (via uv)
 if [ ! -d "backend/.venv" ]; then
     echo -e "${YELLOW}Setting up backend virtualenv...${NC}"
@@ -49,16 +42,6 @@ if [ ! -d "backend/.venv" ]; then
     echo -e "${GREEN}Backend virtualenv ready.${NC}"
 else
     echo -e "${GREEN}Backend virtualenv found.${NC}"
-fi
-
-# Set up vllm virtualenv
-if [ ! -d "vllm-env" ]; then
-    echo -e "${YELLOW}Setting up vllm virtualenv...${NC}"
-    python3.11 -m venv vllm-env
-    vllm-env/bin/pip install --quiet vllm
-    echo -e "${GREEN}vllm virtualenv ready.${NC}"
-else
-    echo -e "${GREEN}vllm virtualenv found.${NC}"
 fi
 
 # Set up frontend dependencies
@@ -85,6 +68,7 @@ if ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
 else
     echo -e "${GREEN}Ollama is running.${NC}"
     echo "Checking Ollama models..."
+    ollama pull minicpm-v 2>/dev/null || true
     ollama pull nomic-embed-text 2>/dev/null || true
     ollama pull llama3.2 2>/dev/null || true
     echo -e "${GREEN}Ollama models ready.${NC}"
@@ -105,7 +89,6 @@ echo -e "${BLUE}Application URLs:${NC}"
 echo "  Frontend:  http://localhost:5173"
 echo "  Backend:   http://localhost:8000"
 echo "  API Docs:  http://localhost:8000/docs"
-echo "  dots.ocr:  http://localhost:8001"
 echo ""
-echo "See docs/DOTS_OCR_SETUP.md for detailed setup instructions."
+echo "See docs/QUICKSTART.md for detailed setup instructions."
 echo ""

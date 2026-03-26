@@ -8,10 +8,10 @@ class Settings(BaseSettings):
     worker_timeout: int = 300
     max_file_size: int = 52428800  # 50MB
 
-    # dots.ocr configuration
-    dots_ocr_url: str = "http://localhost:8001/v1/chat/completions"
-    dots_ocr_model: str = "rednote-hilab/dots.ocr"
-    dots_ocr_prompt_mode: str = "prompt_layout_all_en"
+    # Ollama OCR configuration (minicpm-v)
+    dots_ocr_url: str = "http://localhost:11434/v1/chat/completions"
+    dots_ocr_model: str = "minicpm-v"
+    dots_ocr_prompt_mode: str = "Extract all text from this document image. Preserve the layout, headings, tables, and structure. Output as structured markdown."
 
     # Ollama configuration
     ollama_base_url: str = "http://localhost:11434"

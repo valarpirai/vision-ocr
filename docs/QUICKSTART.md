@@ -9,7 +9,7 @@ Before starting, ensure you have:
 - [x] Python 3.10+ installed
 - [x] Node.js 18+ installed
 - [x] Git installed
-- [x] CUDA-capable GPU (optional but recommended for dots.ocr)
+- [x] Ollama installed (https://ollama.com)
 
 ## Step 1: Install Dependencies
 
@@ -39,39 +39,7 @@ npm install
 cd ..
 ```
 
-## Step 3: Setup dots.ocr (Required for OCR)
-
-### Option A: Quick Setup (Recommended)
-
-```bash
-# Create conda environment
-conda create -n dots_ocr python=3.12
-conda activate dots_ocr
-
-# Clone and install dots.ocr
-git clone https://github.com/rednote-hilab/dots.ocr.git ~/dots.ocr
-cd ~/dots.ocr
-
-# Install PyTorch with CUDA 12.8
-pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cu128
-
-# Install dots.ocr
-pip install -e .
-
-# Download model weights (~2GB)
-python3 tools/download_model.py
-```
-
-### Option B: CPU Only (Slower)
-
-```bash
-# Use CPU PyTorch instead
-pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorch.org/whl/cpu
-```
-
-**See [DOTS_OCR_SETUP.md](DOTS_OCR_SETUP.md) for detailed setup and troubleshooting.**
-
-## Step 4: Setup Ollama (Required for RAG Search)
+## Step 3: Setup Ollama (Required for OCR and RAG Search)
 
 Install Ollama from https://ollama.com, then pull the required models:
 
@@ -80,6 +48,7 @@ Install Ollama from https://ollama.com, then pull the required models:
 ollama serve
 
 # In another terminal, pull the required models
+ollama pull minicpm-v          # OCR vision model
 ollama pull nomic-embed-text   # embedding model
 ollama pull llama3.2           # LLM for answer generation
 ```
@@ -89,30 +58,15 @@ Verify models are available:
 ollama list
 ```
 
-## Step 5: Start the Application
+## Step 4: Start the Application
 
-### Terminal 1: Start dots.ocr Server
-
-```bash
-conda activate dots_ocr
-cd ~/dots.ocr
-
-# Start vLLM server on port 8001
-vllm serve rednote-hilab/dots.ocr \
-  --trust-remote-code \
-  --async-scheduling \
-  --port 8001
-```
-
-Wait for "Application startup complete" message.
-
-### Terminal 2: Start Ollama
+### Terminal 1: Start Ollama
 
 ```bash
 ollama serve
 ```
 
-### Terminal 3: Start Vision OCR Application
+### Terminal 2: Start Vision OCR Application
 
 ```bash
 cd /path/to/vision
@@ -163,7 +117,7 @@ python3 test_integration.py
 
 This will check:
 - ✓ Backend health
-- ✓ dots.ocr server connectivity
+- ✓ Ollama connectivity
 - ✓ API endpoints
 - ✓ Database setup
 
@@ -182,15 +136,6 @@ lsof -i :5173
 kill -9 <PID>
 ```
 
-### dots.ocr Server Not Starting
-
-Check CUDA availability:
-```bash
-python3 -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')"
-```
-
-If CUDA is not available, use CPU mode (will be slower).
-
 ### Workers Not Processing
 
 Check worker logs:
@@ -198,7 +143,7 @@ Check worker logs:
 pm2 logs worker
 ```
 
-Make sure dots.ocr server is running and accessible at `http://localhost:8001`.
+Make sure Ollama is running and accessible at `http://localhost:11434`.
 
 ### Database Locked
 
@@ -218,15 +163,14 @@ pm2 stop all
 # Or delete all processes
 pm2 delete all
 
-# Stop dots.ocr server
-# Press Ctrl+C in the terminal where vLLM is running
+# Stop Ollama server
+# Press Ctrl+C in the terminal where Ollama is running
 ```
 
 ## Next Steps
 
 - **[README.md](../README.md)** - Full documentation
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture
-- **[DOTS_OCR_SETUP.md](DOTS_OCR_SETUP.md)** - Detailed dots.ocr setup
 
 ## Troubleshooting
 
@@ -248,14 +192,15 @@ npm run dev
 
 ### OCR processing fails
 
-1. Check dots.ocr server logs
+1. Check Ollama is running: `ollama list`
 2. Verify API URL in `backend/.env`:
    ```
-   DOTS_OCR_URL=http://localhost:8001/v1/chat/completions
+   DOTS_OCR_URL=http://localhost:11434/v1/chat/completions
+   DOTS_OCR_MODEL=minicpm-v
    ```
-3. Test dots.ocr directly:
+3. Test Ollama directly:
    ```bash
-   curl http://localhost:8001/health
+   curl http://localhost:11434/api/tags
    ```
 
 ### Upload fails
@@ -298,11 +243,11 @@ llama3.2 runs on CPU if no GPU is available. Consider using a smaller model by s
 
 ## Performance Tips
 
-- **GPU**: Use CUDA for 10-50x faster OCR processing
 - **Workers**: Adjust worker count in `ecosystem.config.js` (default: 3)
 - **Chunk Size**: Increase if you have very large OCR results
 - **Polling**: Adjust `WORKER_POLL_INTERVAL` in `.env` for faster/slower polling
 - **RAG Results**: Adjust `RAG_N_RESULTS` to control how many document chunks are retrieved per query
+- **OCR Speed**: minicpm-v runs on CPU via Ollama; consider using a smaller model if speed is critical
 
 ## Development Mode
 
@@ -321,10 +266,7 @@ npm run dev
 cd backend
 uv run python worker.py
 
-# Terminal 4: dots.ocr server
-vllm serve rednote-hilab/dots.ocr --trust-remote-code --async-scheduling --port 8001
-
-# Terminal 5: Ollama (for RAG search)
+# Terminal 4: Ollama (for OCR and RAG search)
 ollama serve
 ```
 
@@ -347,7 +289,7 @@ docker-compose logs -f
 docker-compose down
 ```
 
-**Note**: dots.ocr server needs to be run separately with GPU access.
+**Note**: Ollama server needs to be run separately or added to the docker-compose configuration.
 
 ---
 

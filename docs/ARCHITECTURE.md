@@ -92,7 +92,7 @@
 │  │  3. Load file from disk                                          │   │
 │  │  4. Convert PDF to images (if needed)                            │   │
 │  │  5. Encode images to base64                                      │   │
-│  │  6. Call dots.ocr API for each page                              │   │
+│  │  6. Call Ollama minicpm-v API for each page                      │   │
 │  │  7. Receive structured OCR result                                │   │
 │  │  8. Base64 encode result JSON                                    │   │
 │  │  9. Split into 1024-byte chunks                                  │   │
@@ -109,23 +109,22 @@
                                   │
                                   │
 ┌─────────────────────────────────▼────────────────────────────────────────┐
-│                    dots.ocr vLLM Inference Server                          │
-│                         http://localhost:8001                              │
+│                    Ollama Inference Server                                 │
+│                         http://localhost:11434                             │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │                       Vision-Language Model                      │    │
-│  │                  rednote-hilab/dots.ocr (1.7B)                   │    │
+│  │                  minicpm-v (via Ollama)                          │    │
 │  │                                                                   │    │
 │  │  Tasks:                                                          │    │
 │  │  - Layout Detection                                              │    │
 │  │  - Text Recognition                                              │    │
-│  │  - Table Extraction                                              │    │
-│  │  - Formula Recognition                                           │    │
-│  │  - Reading Order                                                 │    │
+│  │  - Document OCR                                                  │    │
+│  │  - Structured Markdown Output                                    │    │
 │  │                                                                   │    │
 │  │  Output: JSON with structured layout + text                     │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
 │                                                                            │
-│  Running on GPU with vLLM for fast inference                              │
+│  Runs on CPU via Ollama (Apple Silicon compatible)                        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -178,18 +177,18 @@ Worker Process
     │ 5. If PDF: convert to images
     │
     ▼
-dots.ocr vLLM Server
+Ollama Server (minicpm-v)
     │
     │ 6. POST /v1/chat/completions
     │    - Base64 encoded image
-    │    - Prompt mode
+    │    - Prompt: Extract text with layout
     │
-    │ 7. Model inference (GPU)
+    │ 7. Model inference (CPU)
     │
     │ 8. Return structured JSON
-    │    - Layout elements
-    │    - Text content
-    │    - Bounding boxes
+    │    - Markdown-formatted text
+    │    - Layout preserved
+    │    - Document structure
     │
     ▼
 Worker Process
@@ -385,7 +384,7 @@ User Browser
 - **Key Features**:
   - Database polling with row locking (`SELECT FOR UPDATE SKIP LOCKED`)
   - Image/PDF handling
-  - dots.ocr API integration
+  - Ollama minicpm-v API integration
   - Result chunking and storage
   - Auto-indexing completed documents into ChromaDB
 - **Technology**: Python, requests, Pillow, pdf2image
@@ -408,13 +407,14 @@ User Browser
   - Persistent multi-turn conversation history
 - **Technology**: ChromaDB (vector store), Ollama `nomic-embed-text` (embeddings), Ollama `llama3.2` (LLM)
 
-### dots.ocr Server
-- **Responsibility**: OCR inference
+### Ollama Server
+- **Responsibility**: OCR inference via minicpm-v
 - **Key Features**:
   - Vision-language model inference
-  - Multi-task OCR (layout, text, tables, formulas)
-  - Multilingual support
-- **Technology**: vLLM, PyTorch, CUDA
+  - Document OCR with layout preservation
+  - Structured markdown output
+  - OpenAI-compatible API
+- **Technology**: Ollama, minicpm-v model
 
 ## Deployment Architectures
 
@@ -431,8 +431,7 @@ User Browser
       │
       ├─ SQLite (./app.db)
       ├─ ChromaDB (./chroma_db/)
-      ├─ Ollama (port 11434)  ← nomic-embed-text + llama3.2
-      └─ dots.ocr vLLM (port 8001)
+      └─ Ollama (port 11434)  ← minicpm-v + nomic-embed-text + llama3.2
 ```
 
 ### Docker Production
@@ -458,8 +457,8 @@ User Browser
 │  - uploads_data                 │
 └─────────────────────────────────┘
       │
-      └─ External dots.ocr vLLM
-         (port 8001, GPU required)
+      └─ External Ollama Server
+         (port 11434, can run on same host)
 ```
 
 ## Scalability Considerations
@@ -467,11 +466,11 @@ User Browser
 1. **Worker Scaling**: Add more worker instances (configurable in ecosystem.config.js or docker-compose.yml)
 2. **Database**: Switch from SQLite to PostgreSQL for production
 3. **File Storage**: Move to S3/object storage for distributed deployments
-4. **OCR Server**: Scale vLLM horizontally with load balancer
+4. **OCR Server**: Deploy multiple Ollama instances with load balancer
 5. **Frontend**: Add nginx reverse proxy for production
 6. **Caching**: Add Redis for status polling optimization
 7. **Vector Store**: ChromaDB can be replaced with a distributed vector DB (Qdrant, Weaviate) for large-scale deployments
-8. **LLM**: Swap `llama3.2` for a larger/faster Ollama model via the `OLLAMA_LLM_MODEL` env var; no code changes needed
+8. **LLM**: Swap `llama3.2` or `minicpm-v` for larger/faster Ollama models via env vars; no code changes needed
 
 ## Security Notes
 

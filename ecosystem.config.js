@@ -1,16 +1,7 @@
 const BACKEND_PYTHON = "./backend/.venv/bin/python";
-const VLLM_BIN = "./vllm-env/bin/vllm";
 
 module.exports = {
   apps: [
-    {
-      name: "dots-ocr",
-      script: VLLM_BIN,
-      interpreter: "none",
-      args: "serve rednote-hilab/dots.ocr --trust-remote-code --async-scheduling --port 8001",
-      autorestart: false,
-      watch: false,
-    },
     {
       name: "backend",
       cwd: "./backend",
@@ -23,9 +14,9 @@ module.exports = {
         WORKER_POLL_INTERVAL: "5",
         WORKER_TIMEOUT: "300",
         MAX_FILE_SIZE: "52428800",
-        DOTS_OCR_URL: "http://localhost:8001/v1/chat/completions",
-        DOTS_OCR_MODEL: "rednote-hilab/dots.ocr",
-        DOTS_OCR_PROMPT_MODE: "prompt_layout_all_en",
+        DOTS_OCR_URL: "http://localhost:11434/v1/chat/completions",
+        DOTS_OCR_MODEL: "minicpm-v",
+        DOTS_OCR_PROMPT_MODE: "Extract all text from this document image. Preserve the layout, headings, tables, and structure. Output as structured markdown.",
         OLLAMA_BASE_URL: "http://localhost:11434",
         OLLAMA_EMBED_MODEL: "nomic-embed-text",
         OLLAMA_LLM_MODEL: "llama3.2",
@@ -48,9 +39,9 @@ module.exports = {
         UPLOAD_DIR: "./uploads",
         WORKER_POLL_INTERVAL: "5",
         WORKER_TIMEOUT: "300",
-        DOTS_OCR_URL: "http://localhost:8001/v1/chat/completions",
-        DOTS_OCR_MODEL: "rednote-hilab/dots.ocr",
-        DOTS_OCR_PROMPT_MODE: "prompt_layout_all_en",
+        DOTS_OCR_URL: "http://localhost:11434/v1/chat/completions",
+        DOTS_OCR_MODEL: "minicpm-v",
+        DOTS_OCR_PROMPT_MODE: "Extract all text from this document image. Preserve the layout, headings, tables, and structure. Output as structured markdown.",
         OLLAMA_BASE_URL: "http://localhost:11434",
         OLLAMA_EMBED_MODEL: "nomic-embed-text",
         CHROMA_PERSIST_DIR: "./chroma_db",

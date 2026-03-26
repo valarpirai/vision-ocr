@@ -5,7 +5,7 @@ Vision OCR is a full-stack web app for uploading documents, extracting text via 
 ## Stack
 
 - **Backend**: Python 3.10+, FastAPI, SQLAlchemy 2, SQLite (dev) / PostgreSQL (prod)
-- **Worker**: 3 parallel instances, each polls DB with `SELECT FOR UPDATE SKIP LOCKED`, calls dots.ocr API, then indexes into ChromaDB
+- **Worker**: 3 parallel instances, each polls DB with `SELECT FOR UPDATE SKIP LOCKED`, calls Ollama minicpm-v for OCR, then indexes into ChromaDB
 - **RAG**: ChromaDB (vector store), Ollama `nomic-embed-text` (embeddings), Ollama `llama3.2` (LLM)
 - **Frontend**: React 19, TypeScript, Vite 7, Tailwind CSS 4, React Router 7, Axios
 - **Package managers**: `uv` for Python, `pnpm` for Node
@@ -94,21 +94,20 @@ pnpm lint
 
 ### External services required
 ```bash
-# dots.ocr (OCR inference) — port 8001
-vllm serve rednote-hilab/dots.ocr --trust-remote-code --async-scheduling --port 8001
-
-# Ollama (embeddings + LLM) — port 11434
+# Ollama (OCR + embeddings + LLM) — port 11434
 ollama serve
-ollama pull nomic-embed-text
-ollama pull llama3.2
+ollama pull minicpm-v        # OCR vision model
+ollama pull nomic-embed-text # Embeddings
+ollama pull llama3.2         # LLM for Q&A
 ```
 
 ### Environment variables (backend/.env)
 ```
 DATABASE_URL=sqlite:///./app.db
 UPLOAD_DIR=./uploads
-DOTS_OCR_URL=http://localhost:8001/v1/chat/completions
-DOTS_OCR_MODEL=rednote-hilab/dots.ocr
+DOTS_OCR_URL=http://localhost:11434/v1/chat/completions
+DOTS_OCR_MODEL=minicpm-v
+DOTS_OCR_PROMPT_MODE=Extract all text from this document image. Preserve the layout, headings, tables, and structure. Output as structured markdown.
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_EMBED_MODEL=nomic-embed-text
 OLLAMA_LLM_MODEL=llama3.2
@@ -197,7 +196,7 @@ Ask message body: `{ "question": str, "upload_ids": [str] }` — `upload_ids` is
 - DB sessions use `get_db()` via FastAPI `Depends`. Worker uses `SessionLocal()` directly (no DI framework).
 - New API routers go in `backend/app/api/`, then register in `main.py` with `app.include_router(...)`.
 - RAG modules (`rag/`) are pure functions — no FastAPI imports, no DB sessions. Keep them testable in isolation.
-- OCR result JSON format: `{"file": str, "pages": [{"page_number": int, "content": str, "raw_response": dict}], "metadata": {"total_pages": int, "processing_time": float}}`. The `content` field is the raw string returned by the dots.ocr vLLM model (structured markdown with layout tags, not plain prose). This is the text embedded into ChromaDB as-is.
+- OCR result JSON format: `{"file": str, "pages": [{"page_number": int, "content": str, "raw_response": dict}], "metadata": {"total_pages": int, "processing_time": float}}`. The `content` field is the raw string returned by the Ollama minicpm-v model (structured markdown with layout tags, not plain prose). This is the text embedded into ChromaDB as-is.
 - ChromaDB document IDs are `{upload_id}_page_{page_number}` — deterministic so re-indexing is idempotent.
 - Indexing errors in the worker are caught and logged but never mark the upload as FAILED.
 
