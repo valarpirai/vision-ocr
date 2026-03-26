@@ -380,7 +380,19 @@ export default function HistoryPage() {
                       </div>
                     )}
 
-                    {!selectedUpload.mime_type.startsWith("image/") && selectedUpload.mime_type !== "application/pdf" && (
+                    {selectedUpload.mime_type.startsWith("text/") && (
+                      <div className="border border-gray-200 rounded-lg bg-white">
+                        <iframe
+                          src={getFileUrl(selectedUpload.id)}
+                          className="w-full h-[600px] p-4"
+                          title="Text file preview"
+                        />
+                      </div>
+                    )}
+
+                    {!selectedUpload.mime_type.startsWith("image/") &&
+                     selectedUpload.mime_type !== "application/pdf" &&
+                     !selectedUpload.mime_type.startsWith("text/") && (
                       <div className="p-8 text-center text-gray-500 border border-gray-200 rounded-lg">
                         <p>Preview not available for this file type</p>
                         <a
@@ -448,9 +460,35 @@ export default function HistoryPage() {
                   resultLoading ? (
                     <p className="text-gray-600">Loading result...</p>
                   ) : ocrResult ? (
-                    <pre className="bg-white p-4 rounded-lg overflow-auto text-xs sm:text-sm border border-gray-200">
-                      {JSON.stringify(ocrResult, null, 2)}
-                    </pre>
+                    <div className="space-y-4">
+                      {/* Display extracted text content */}
+                      {(() => {
+                        const result = ocrResult as { pages?: Array<{ page_number: number; content: string }> };
+                        if (result.pages && result.pages.length > 0) {
+                          return (
+                            <div className="space-y-6">
+                              {result.pages.map((page, idx) => (
+                                <div key={idx} className="bg-white p-4 rounded-lg border border-gray-200">
+                                  <div className="text-sm font-semibold text-gray-600 mb-2">
+                                    Page {page.page_number}
+                                  </div>
+                                  <div className="prose prose-sm max-w-none">
+                                    <pre className="whitespace-pre-wrap text-gray-800 font-mono text-xs">
+                                      {page.content}
+                                    </pre>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return (
+                          <pre className="bg-white p-4 rounded-lg overflow-auto text-xs sm:text-sm border border-gray-200">
+                            {JSON.stringify(ocrResult, null, 2)}
+                          </pre>
+                        );
+                      })()}
+                    </div>
                   ) : (
                     <p className="text-gray-600">No result data</p>
                   )

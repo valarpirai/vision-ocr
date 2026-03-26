@@ -206,7 +206,7 @@ npm run dev
 ### Upload fails
 
 - Check file size (max 50MB by default)
-- Verify file type (PNG, JPG, PDF, TIFF only)
+- Verify file type (PNG, JPG, PDF, TIFF, Markdown, Text supported)
 - Check backend logs: `pm2 logs backend`
 
 ## RAG Search Troubleshooting

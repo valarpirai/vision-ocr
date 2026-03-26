@@ -16,7 +16,7 @@ from ..rag import indexer as rag_indexer
 
 router = APIRouter()
 
-ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".pdf", ".tiff", ".tif"}
+ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".pdf", ".tiff", ".tif", ".md", ".txt"}
 
 
 def reconstruct_ocr_result(upload_id: str, db: Session) -> dict:
@@ -124,9 +124,11 @@ def get_upload_file(upload_id: str, db: Session = Depends(get_db)):
     if not safe_filename:
         safe_filename = "file" + os.path.splitext(upload.filename)[1]
 
-    # For PDFs and images, serve inline (opens in browser)
+    # For PDFs, images, and text files, serve inline (opens in browser)
     # For other files, serve as attachment (triggers download)
-    if media_type == "application/pdf" or media_type.startswith("image/"):
+    if (media_type == "application/pdf" or
+        media_type.startswith("image/") or
+        media_type.startswith("text/")):
         return FileResponse(
             path=upload.file_path,
             media_type=media_type,

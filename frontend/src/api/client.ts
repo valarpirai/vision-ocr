@@ -11,8 +11,14 @@ import type {
 
 const API_BASE_URL = "http://localhost:8000/api";
 
+// Timeout constants
+const UPLOAD_TIMEOUT = 20000; // 20 seconds for file uploads
+const CHAT_TIMEOUT = 30000;   // 30 seconds for chat/RAG operations
+const DEFAULT_TIMEOUT = 10000; // 10 seconds for other operations
+
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: DEFAULT_TIMEOUT,
 });
 
 export const uploadFile = async (file: File): Promise<UploadListItem> => {
@@ -23,6 +29,7 @@ export const uploadFile = async (file: File): Promise<UploadListItem> => {
     headers: {
       "Content-Type": "multipart/form-data",
     },
+    timeout: UPLOAD_TIMEOUT,
   });
 
   return response.data;
@@ -103,6 +110,8 @@ export const askQuestion = async (
   conversationId: string,
   request: AskRequest
 ): Promise<AskResponse> => {
-  const response = await api.post(`/conversations/${conversationId}/messages`, request);
+  const response = await api.post(`/conversations/${conversationId}/messages`, request, {
+    timeout: CHAT_TIMEOUT,
+  });
   return response.data;
 };

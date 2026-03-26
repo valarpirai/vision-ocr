@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     rag_context_window: int = 10
     rag_max_distance: float = 0.7  # cosine distance threshold; chunks above this are discarded
 
+    # API timeouts
+    upload_request_timeout: int = 20  # seconds - for file upload endpoints
+    chat_request_timeout: int = 30    # seconds - for chat/RAG endpoints
+
     # CORS
     cors_origins: str = "http://localhost:5173"
 

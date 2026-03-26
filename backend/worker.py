@@ -26,6 +26,49 @@ def _handle_signal(signum, frame):
 
 
 CHUNK_SIZE = 1024  # bytes
+TEXT_FILE_EXTENSIONS = {".md", ".txt"}
+
+
+def is_text_file(file_path: str) -> bool:
+    """Check if file is a text file (markdown or plain text)."""
+    ext = os.path.splitext(file_path)[1].lower()
+    return ext in TEXT_FILE_EXTENSIONS
+
+
+def process_text_file(file_path: str) -> dict:
+    """
+    Process text file (markdown or plain text) by reading content directly.
+    Returns same structure as OCR result for consistency.
+    """
+    start_time = time.time()
+
+    # Read text content
+    with open(file_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    processing_time = time.time() - start_time
+
+    # Format as single-page result (matching OCR structure)
+    result = {
+        "file": file_path,
+        "pages": [
+            {
+                "page_number": 1,
+                "content": content,
+                "raw_response": {
+                    "type": "text_file",
+                    "message": "Text file processed without OCR"
+                }
+            }
+        ],
+        "metadata": {
+            "total_pages": 1,
+            "processing_time": processing_time,
+            "source_type": "text_file"
+        }
+    }
+
+    return result
 
 
 def encode_image_to_base64(image: Image.Image) -> str:
@@ -165,8 +208,13 @@ def process_upload(upload: Upload, db: Session):
         upload.status = UploadStatus.PROCESSING
         db.commit()
 
-        # Process with dots.ocr
-        result = process_with_dots_ocr(upload.file_path)
+        # Check if text file (skip OCR)
+        if is_text_file(upload.file_path):
+            print(f"Text file detected, skipping OCR")
+            result = process_text_file(upload.file_path)
+        else:
+            # Process with OCR
+            result = process_with_dots_ocr(upload.file_path)
 
         # Store chunks
         total_chunks = chunk_and_store_result(upload.id, result, db)

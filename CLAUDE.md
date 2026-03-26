@@ -1,6 +1,6 @@
 # CLAUDE.md — Vision OCR
 
-Vision OCR is a full-stack web app for uploading documents, extracting text via the dots.ocr AI model, and searching document content via RAG (ChromaDB + Ollama).
+Vision OCR is a full-stack web app for uploading documents (images, PDFs, markdown, text files), extracting text via OCR (Ollama minicpm-v), and searching document content via RAG (ChromaDB + Ollama). Text files (.md/.txt) skip OCR processing and are indexed directly.
 
 ## Stack
 
@@ -196,7 +196,8 @@ Ask message body: `{ "question": str, "upload_ids": [str] }` — `upload_ids` is
 - DB sessions use `get_db()` via FastAPI `Depends`. Worker uses `SessionLocal()` directly (no DI framework).
 - New API routers go in `backend/app/api/`, then register in `main.py` with `app.include_router(...)`.
 - RAG modules (`rag/`) are pure functions — no FastAPI imports, no DB sessions. Keep them testable in isolation.
-- OCR result JSON format: `{"file": str, "pages": [{"page_number": int, "content": str, "raw_response": dict}], "metadata": {"total_pages": int, "processing_time": float}}`. The `content` field is the raw string returned by the Ollama minicpm-v model (structured markdown with layout tags, not plain prose). This is the text embedded into ChromaDB as-is.
+- **Supported file types**: `.png`, `.jpg`, `.jpeg`, `.pdf`, `.tiff`, `.tif`, `.md`, `.txt`. Text files (`.md`, `.txt`) skip OCR processing — the worker reads content directly and formats it as a single-page OCR result for consistency.
+- OCR result JSON format: `{"file": str, "pages": [{"page_number": int, "content": str, "raw_response": dict}], "metadata": {"total_pages": int, "processing_time": float}}`. The `content` field is the raw string returned by the Ollama minicpm-v model (structured markdown with layout tags, not plain prose) or the raw text from .md/.txt files. This is the text embedded into ChromaDB as-is.
 - ChromaDB document IDs are `{upload_id}_page_{page_number}` — deterministic so re-indexing is idempotent.
 - Indexing errors in the worker are caught and logged but never mark the upload as FAILED.
 
