@@ -39,6 +39,10 @@ def search(
 
     chunks = []
     for i, doc_id in enumerate(results["ids"][0]):
+        distance = results["distances"][0][i]
+        if distance > settings.rag_max_distance:
+            continue  # discard low-relevance chunks to reduce hallucination risk
+
         metadata = results["metadatas"][0][i]
         chunks.append({
             "id": doc_id,
@@ -48,7 +52,7 @@ def search(
             "chunk_index": metadata.get("chunk_index", 0),
             "chunk_type": metadata.get("chunk_type", "paragraph"),
             "content": results["documents"][0][i],
-            "distance": results["distances"][0][i],
+            "distance": distance,
         })
 
     return chunks

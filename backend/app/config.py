@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # RAG configuration
     rag_n_results: int = 5
     rag_context_window: int = 10
+    rag_max_distance: float = 0.7  # cosine distance threshold; chunks above this are discarded
 
     class Config:
         env_file = ".env"
