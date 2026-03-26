@@ -184,7 +184,7 @@ def ask_question(
                 page_number=chunk["page_number"],
             ))
 
-    sources_json = json.dumps([s.dict() for s in sources])
+    sources_json = json.dumps([s.model_dump() for s in sources])
 
     # Persist user message
     user_msg = ConversationMessage(

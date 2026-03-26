@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     rag_context_window: int = 10
     rag_max_distance: float = 0.7  # cosine distance threshold; chunks above this are discarded
 
+    # CORS
+    cors_origins: str = "http://localhost:5173"
+
     class Config:
         env_file = ".env"
 

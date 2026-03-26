@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api import upload, rag
 from .database import Base, engine
+from .config import settings
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -11,7 +12,7 @@ app = FastAPI(title="Vision OCR API")
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

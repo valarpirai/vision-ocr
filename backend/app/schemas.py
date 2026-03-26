@@ -22,6 +22,7 @@ class UploadDetail(BaseModel):
     status: UploadStatus
     uploaded_at: datetime
     processed_at: Optional[datetime]
+    indexed_at: Optional[datetime]
     total_chunks: Optional[int]
     error_message: Optional[str]
 

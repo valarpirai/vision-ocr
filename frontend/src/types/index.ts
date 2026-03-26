@@ -15,6 +15,7 @@ export interface Upload {
   status: UploadStatus;
   uploaded_at: string;
   processed_at?: string;
+  indexed_at?: string;
   total_chunks?: number;
   error_message?: string;
 }

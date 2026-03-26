@@ -1,6 +1,9 @@
+import logging
 from typing import List, Dict, Any
 import requests
 from ..config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _sort_chunks_by_document_order(chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -78,8 +81,12 @@ def rewrite_query(question: str, conversation_history: List[Dict[str, str]]) -> 
         response.raise_for_status()
         rewritten = response.json()["message"]["content"].strip()
         # Sanity check: if the model returns something too short or empty, use original
-        return rewritten if len(rewritten) > 5 else question
-    except Exception:
+        if len(rewritten) <= 5:
+            logger.warning("Query rewrite returned too-short result %r, using original", rewritten)
+            return question
+        return rewritten
+    except Exception as e:
+        logger.warning("Query rewrite failed (%s), falling back to original question", e)
         return question
 
 

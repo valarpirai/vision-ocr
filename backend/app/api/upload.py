@@ -2,6 +2,7 @@ import os
 import uuid
 import base64
 import json
+import shutil
 from typing import Optional, List
 from urllib.parse import quote
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
@@ -11,6 +12,7 @@ from ..database import get_db
 from ..models import Upload, UploadStatus, OCRResult
 from ..schemas import UploadResponse, UploadDetail, StatusResponse
 from ..config import settings
+from ..rag import indexer as rag_indexer
 
 router = APIRouter()
 
@@ -138,6 +140,31 @@ def get_upload_file(upload_id: str, db: Session = Depends(get_db)):
         )
 
 
+@router.delete("/uploads/{upload_id}", status_code=204)
+def delete_upload(upload_id: str, db: Session = Depends(get_db)):
+    """Delete an upload and all associated data (OCR chunks, ChromaDB vectors, file on disk)."""
+    upload = db.query(Upload).filter(Upload.id == upload_id).first()
+    if not upload:
+        raise HTTPException(status_code=404, detail="Upload not found")
+
+    if upload.status == UploadStatus.PROCESSING:
+        raise HTTPException(status_code=400, detail="Cannot delete an upload that is currently processing")
+
+    # Remove ChromaDB vectors (non-fatal)
+    try:
+        rag_indexer.delete_upload(upload_id)
+    except Exception:
+        pass
+
+    # Delete file from disk
+    upload_dir = os.path.dirname(upload.file_path)
+    if os.path.exists(upload_dir):
+        shutil.rmtree(upload_dir, ignore_errors=True)
+
+    db.delete(upload)
+    db.commit()
+
+
 @router.post("/uploads/{upload_id}/retry")
 def retry_upload(upload_id: str, db: Session = Depends(get_db)):
     """Retry processing for a failed upload."""
@@ -172,8 +199,12 @@ def get_upload_result(upload_id: str, db: Session = Depends(get_db)):
     if not upload:
         raise HTTPException(status_code=404, detail="Upload not found")
 
-    if upload.status != UploadStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="OCR running")
+    if upload.status == UploadStatus.PENDING:
+        raise HTTPException(status_code=400, detail="OCR pending — waiting for worker")
+    elif upload.status == UploadStatus.PROCESSING:
+        raise HTTPException(status_code=400, detail="OCR in progress")
+    elif upload.status == UploadStatus.FAILED:
+        raise HTTPException(status_code=400, detail=f"OCR failed: {upload.error_message}")
 
     result = reconstruct_ocr_result(upload_id, db)
     return result
@@ -187,7 +218,7 @@ def export_markdown(upload_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Upload not found")
 
     if upload.status != UploadStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="OCR running")
+        raise HTTPException(status_code=400, detail=f"OCR not completed (status: {upload.status.value})")
 
     result = reconstruct_ocr_result(upload_id, db)
 
@@ -219,7 +250,7 @@ def export_json(upload_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Upload not found")
 
     if upload.status != UploadStatus.COMPLETED:
-        raise HTTPException(status_code=400, detail="OCR running")
+        raise HTTPException(status_code=400, detail=f"OCR not completed (status: {upload.status.value})")
 
     result = reconstruct_ocr_result(upload_id, db)
 

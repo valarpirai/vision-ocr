@@ -2,6 +2,7 @@ import time
 import base64
 import json
 import os
+import signal
 from datetime import datetime
 from io import BytesIO
 from typing import List
@@ -14,6 +15,14 @@ from app.database import SessionLocal, engine
 from app.models import Upload, UploadStatus, OCRResult
 from app.config import settings
 from app.rag import indexer as rag_indexer
+
+_shutdown = False
+
+
+def _handle_signal(signum, frame):
+    global _shutdown
+    print(f"Received signal {signum}, shutting down after current job...")
+    _shutdown = True
 
 
 CHUNK_SIZE = 1024  # bytes
@@ -190,7 +199,7 @@ def worker_loop():
     """Main worker loop."""
     print(f"Worker started. Polling interval: {settings.worker_poll_interval}s")
 
-    while True:
+    while not _shutdown:
         db = SessionLocal()
         try:
             # Find pending upload with row locking
@@ -212,8 +221,11 @@ def worker_loop():
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+
     # Ensure uploads directory exists
     os.makedirs(settings.upload_dir, exist_ok=True)
 
-    # Start worker loop
     worker_loop()
+    print("Worker stopped.")
