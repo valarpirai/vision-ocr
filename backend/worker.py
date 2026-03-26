@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal, engine
 from app.models import Upload, UploadStatus, OCRResult
 from app.config import settings
+from app.rag import indexer as rag_indexer
 
 
 CHUNK_SIZE = 1024  # bytes
@@ -168,6 +169,15 @@ def process_upload(upload: Upload, db: Session):
         db.commit()
 
         print(f"Completed upload {upload.id}")
+
+        # Auto-index into ChromaDB for RAG (non-fatal if it fails)
+        try:
+            indexed_count = rag_indexer.index_upload(upload.id, upload.filename, result)
+            upload.indexed_at = datetime.utcnow()
+            db.commit()
+            print(f"Indexed {indexed_count} page(s) for upload {upload.id}")
+        except Exception as index_err:
+            print(f"Warning: RAG indexing failed for upload {upload.id}: {str(index_err)}")
 
     except Exception as e:
         print(f"Error processing upload {upload.id}: {str(e)}")

@@ -45,6 +45,22 @@ if [ ! -f "backend/.env" ]; then
     cp backend/.env.example backend/.env
 fi
 
+# Check if Ollama is running
+if ! curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
+    echo -e "${YELLOW}WARNING: Ollama is not running at http://localhost:11434${NC}"
+    echo "RAG search features will not work without Ollama."
+    echo "Start Ollama with: ollama serve"
+    echo ""
+else
+    echo -e "${GREEN}Ollama is running.${NC}"
+    # Pull required models if not already present
+    echo "Checking Ollama models..."
+    ollama pull nomic-embed-text 2>/dev/null || true
+    ollama pull llama3.2 2>/dev/null || true
+    echo -e "${GREEN}Ollama models ready.${NC}"
+    echo ""
+fi
+
 echo -e "${GREEN}Starting all services with PM2...${NC}"
 pm2 start ecosystem.config.js
 
@@ -63,6 +79,9 @@ echo ""
 echo -e "${YELLOW}IMPORTANT: Make sure dots.ocr vLLM server is running!${NC}"
 echo "Start dots.ocr with:"
 echo "  vllm serve rednote-hilab/dots.ocr --trust-remote-code --async-scheduling --port 8001"
+echo ""
+echo -e "${YELLOW}IMPORTANT: Make sure Ollama is running for RAG search!${NC}"
+echo "Start Ollama with: ollama serve"
 echo ""
 echo "See docs/DOTS_OCR_SETUP.md for detailed setup instructions."
 echo ""

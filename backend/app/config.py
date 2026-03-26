@@ -13,6 +13,18 @@ class Settings(BaseSettings):
     dots_ocr_model: str = "rednote-hilab/dots.ocr"
     dots_ocr_prompt_mode: str = "prompt_layout_all_en"
 
+    # Ollama configuration
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_embed_model: str = "nomic-embed-text"
+    ollama_llm_model: str = "llama3.2"
+
+    # ChromaDB configuration
+    chroma_persist_dir: str = "./chroma_db"
+
+    # RAG configuration
+    rag_n_results: int = 5
+    rag_context_window: int = 10
+
     class Config:
         env_file = ".env"
 

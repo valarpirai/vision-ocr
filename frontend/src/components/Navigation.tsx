@@ -51,6 +51,16 @@ export default function Navigation() {
             >
               <span className="hidden sm:inline">📋 </span>History
             </Link>
+            <Link
+              to="/search"
+              className={`px-3 sm:px-6 py-4 text-sm sm:text-base font-medium transition-all duration-200 border-b-3 ${
+                isActive("/search")
+                  ? "text-green-600 font-bold border-green-600"
+                  : "text-gray-700 border-transparent hover:text-green-600"
+              }`}
+            >
+              <span className="hidden sm:inline">🔍 </span>Search
+            </Link>
           </div>
         </div>
       </div>

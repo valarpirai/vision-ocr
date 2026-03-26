@@ -26,6 +26,7 @@ class Upload(Base):
     processed_at = Column(DateTime, nullable=True)
     total_chunks = Column(Integer, nullable=True)
     error_message = Column(Text, nullable=True)
+    indexed_at = Column(DateTime, nullable=True)
 
     ocr_results = relationship("OCRResult", back_populates="upload", cascade="all, delete-orphan")
 
@@ -39,3 +40,37 @@ class OCRResult(Base):
     chunk_data = Column(Text, nullable=False)
 
     upload = relationship("Upload", back_populates="ocr_results")
+
+
+class MessageRole(str, enum.Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    title = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    messages = relationship(
+        "ConversationMessage",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="ConversationMessage.created_at",
+    )
+
+
+class ConversationMessage(Base):
+    __tablename__ = "conversation_messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    conversation_id = Column(String(36), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
+    role = Column(Enum(MessageRole), nullable=False)
+    content = Column(Text, nullable=False)
+    sources = Column(Text, nullable=True)  # JSON: [{"upload_id", "filename", "page_number"}]
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    conversation = relationship("Conversation", back_populates="messages")

@@ -71,7 +71,25 @@ pip install torch==2.7.0 torchvision==0.22.0 --index-url https://download.pytorc
 
 **See [DOTS_OCR_SETUP.md](DOTS_OCR_SETUP.md) for detailed setup and troubleshooting.**
 
-## Step 4: Start the Application
+## Step 4: Setup Ollama (Required for RAG Search)
+
+Install Ollama from https://ollama.com, then pull the required models:
+
+```bash
+# Start Ollama (runs on port 11434 by default)
+ollama serve
+
+# In another terminal, pull the required models
+ollama pull nomic-embed-text   # embedding model
+ollama pull llama3.2           # LLM for answer generation
+```
+
+Verify models are available:
+```bash
+ollama list
+```
+
+## Step 5: Start the Application
 
 ### Terminal 1: Start dots.ocr Server
 
@@ -88,7 +106,13 @@ vllm serve rednote-hilab/dots.ocr \
 
 Wait for "Application startup complete" message.
 
-### Terminal 2: Start Vision OCR Application
+### Terminal 2: Start Ollama
+
+```bash
+ollama serve
+```
+
+### Terminal 3: Start Vision OCR Application
 
 ```bash
 cd /path/to/vision
@@ -120,6 +144,15 @@ Open your browser:
 5. Watch the status change from "pending" → "processing" → "completed"
 6. Click on the upload to view results
 7. Download as Markdown or JSON
+
+**RAG Search:**
+
+1. Navigate to the "Search" page
+2. Click "New Chat" to start a conversation
+3. Optionally filter to specific documents using the document selector
+4. Type your question and press Enter
+5. View the answer along with source document references
+6. Ask follow-up questions — conversation context is maintained
 
 ### Option 2: Integration Test Script
 
@@ -231,12 +264,45 @@ npm run dev
 - Verify file type (PNG, JPG, PDF, TIFF only)
 - Check backend logs: `pm2 logs backend`
 
+## RAG Search Troubleshooting
+
+### Ollama not running
+
+```bash
+# Start Ollama
+ollama serve
+
+# Verify it is accessible
+curl http://localhost:11434/api/tags
+```
+
+### Models not found
+
+```bash
+ollama pull nomic-embed-text
+ollama pull llama3.2
+```
+
+### Search returns no results
+
+Ensure documents have been processed (status: completed) before searching. Documents are indexed into ChromaDB automatically after OCR completes. Check worker logs:
+
+```bash
+pm2 logs worker
+# Look for: "Indexed N page(s) for upload ..."
+```
+
+### Slow answers
+
+llama3.2 runs on CPU if no GPU is available. Consider using a smaller model by setting `OLLAMA_LLM_MODEL=llama3.2:1b` in your environment.
+
 ## Performance Tips
 
 - **GPU**: Use CUDA for 10-50x faster OCR processing
 - **Workers**: Adjust worker count in `ecosystem.config.js` (default: 3)
 - **Chunk Size**: Increase if you have very large OCR results
 - **Polling**: Adjust `WORKER_POLL_INTERVAL` in `.env` for faster/slower polling
+- **RAG Results**: Adjust `RAG_N_RESULTS` to control how many document chunks are retrieved per query
 
 ## Development Mode
 
@@ -257,6 +323,9 @@ uv run python worker.py
 
 # Terminal 4: dots.ocr server
 vllm serve rednote-hilab/dots.ocr --trust-remote-code --async-scheduling --port 8001
+
+# Terminal 5: Ollama (for RAG search)
+ollama serve
 ```
 
 ## Docker Deployment

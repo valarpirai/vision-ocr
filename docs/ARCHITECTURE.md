@@ -12,13 +12,12 @@
                                  │
 ┌────────────────────────────────▼────────────────────────────────────────┐
 │                          FRONTEND (React + Vite)                          │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────────┐   │
-│  │   Upload Page    │  │  History Page    │  │   API Client        │   │
-│  │  - Drag & Drop   │  │  - Split View    │  │   (Axios)           │   │
-│  │  - File Upload   │  │  - Status Poll   │  │   - Upload          │   │
-│  └──────────────────┘  │  - Export        │  │   - List/Get        │   │
-│                         └──────────────────┘  │   - Download        │   │
-│                                                └─────────────────────┘   │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐    │
+│  │   Upload Page    │  │  History Page    │  │   Search Page    │    │
+│  │  - Drag & Drop   │  │  - Split View    │  │  - Conversations │    │
+│  │  - File Upload   │  │  - Status Poll   │  │  - Doc Filter    │    │
+│  └──────────────────┘  │  - Export        │  │  - Chat + RAG    │    │
+│                         └──────────────────┘  └──────────────────┘    │
 └────────────────────────────────┬────────────────────────────────────────┘
                                  │
                                  │ HTTP/JSON
@@ -28,22 +27,30 @@
 │                         http://localhost:8000                             │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │                      REST API Endpoints                          │    │
-│  │  POST   /api/upload              - Upload file                   │    │
-│  │  GET    /api/uploads             - List uploads (paginated)      │    │
-│  │  GET    /api/uploads/{id}        - Get upload details            │    │
-│  │  GET    /api/uploads/{id}/status - Poll processing status        │    │
-│  │  GET    /api/uploads/{id}/result - Get OCR result JSON           │    │
-│  │  GET    /api/uploads/{id}/export/markdown - Download MD          │    │
-│  │  GET    /api/uploads/{id}/export/json     - Download JSON        │    │
+│  │  POST   /api/upload                        - Upload file         │    │
+│  │  GET    /api/uploads                       - List uploads        │    │
+│  │  GET    /api/uploads/{id}                  - Upload detail       │    │
+│  │  GET    /api/uploads/{id}/status           - Status poll         │    │
+│  │  GET    /api/uploads/{id}/file             - Stream original file │    │
+│  │  GET    /api/uploads/{id}/result           - OCR result JSON     │    │
+│  │  GET    /api/uploads/{id}/export/markdown  - Download MD         │    │
+│  │  GET    /api/uploads/{id}/export/json      - Download JSON       │    │
+│  │  POST   /api/uploads/{id}/retry            - Retry failed        │    │
+│  │  POST   /api/conversations                 - Create conversation │    │
+│  │  GET    /api/conversations                 - List conversations  │    │
+│  │  GET    /api/conversations/{id}            - Get with messages   │    │
+│  │  DELETE /api/conversations/{id}            - Delete              │    │
+│  │  POST   /api/conversations/{id}/messages   - Ask question        │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
 │                                                                            │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌─────────────────────┐   │
 │  │  SQLAlchemy      │  │  Pydantic        │  │  Configuration      │   │
 │  │  Models          │  │  Schemas         │  │  (Settings)         │   │
 │  │  - Upload        │  │  - Validation    │  │  - Database URL     │   │
-│  │  - OCRResult     │  │  - Serialization │  │  - Upload Dir       │   │
-│  └──────────────────┘  └──────────────────┘  │  - OCR URL          │   │
-│                                                └─────────────────────┘   │
+│  │  - OCRResult     │  │  - Serialization │  │  - Ollama URLs      │   │
+│  │  - Conversation  │  │                  │  │  - ChromaDB dir     │   │
+│  │  - Conv.Message  │  │                  │  │  - OCR URL          │   │
+│  └──────────────────┘  └──────────────────┘  └─────────────────────┘   │
 └────────────────────────────────┬────────────────────────────────────────┘
                                  │
                     ┌────────────┴────────────┐
@@ -80,7 +87,7 @@
 │                                                                            │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
 │  │                       Worker Process Loop                         │   │
-│  │  1. Poll DB for pending uploads (SELECT FOR UPDATE)              │   │
+│  │  1. Poll DB for pending uploads (SELECT FOR UPDATE SKIP LOCKED)  │   │
 │  │  2. Update status to "processing"                                │   │
 │  │  3. Load file from disk                                          │   │
 │  │  4. Convert PDF to images (if needed)                            │   │
@@ -91,6 +98,9 @@
 │  │  9. Split into 1024-byte chunks                                  │   │
 │  │  10. Store chunks in database                                    │   │
 │  │  11. Update status to "completed"                                │   │
+│  │  12. Embed each page via Ollama (nomic-embed-text)               │   │
+│  │  13. Upsert page vectors into ChromaDB                           │   │
+│  │  14. Set indexed_at timestamp (indexing failure is non-fatal)    │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 │                                 │                                          │
 │                                 │ HTTP POST /v1/chat/completions          │
@@ -193,7 +203,10 @@ Worker Process
 Database
     │
     │ Status: COMPLETED ✓
-    └─── Ready for viewing/export
+    │
+    ▼
+RAG Indexing (same synchronous call — see "RAG Indexing Flow" below)
+    └─── indexed_at timestamp set; document is now searchable
 ```
 
 ### 3. Viewing Flow
@@ -235,7 +248,86 @@ Frontend (Split View)
     └─ Right Panel: OCR result display
 ```
 
-### 4. Export Flow
+### 4. RAG Indexing Flow (runs within the same worker call, after step 11)
+
+```
+Worker Process
+    │
+    │ After status=COMPLETED
+    │
+    ▼
+OCR Result (in memory)
+    │
+    │ For each page: page["content"] (plain text)
+    │
+    ▼
+Ollama (nomic-embed-text)
+    │
+    │ POST /api/embeddings
+    │ Returns: List[float] (768 dims)
+    │
+    ▼
+ChromaDB (vision_ocr_docs collection)
+    │
+    │ collection.upsert(
+    │   id="{upload_id}_page_{page_number}",
+    │   embedding=[...],
+    │   document=content,
+    │   metadata={upload_id, filename, page_number}
+    │ )
+    │
+    ▼
+Upload.indexed_at = now()
+    └─── Document is now searchable
+```
+
+### 5. RAG Search Flow
+
+```
+User Browser (SearchPage)
+    │
+    │ 1. POST /api/conversations          (create or reuse)
+    │ 2. POST /api/conversations/{id}/messages
+    │    body: { question, upload_ids? }
+    │
+    ▼
+Backend (rag.py)
+    │
+    │ 3. Load prior messages (last 10) as history
+    │ 4. Embed question via Ollama (nomic-embed-text)
+    │
+    ▼
+ChromaDB
+    │
+    │ 5. Query top-5 nearest chunks
+    │    (filtered by upload_ids if provided)
+    │
+    ▼
+Backend
+    │
+    │ 6. Build system prompt with retrieved chunks
+    │ 7. POST /api/chat to Ollama (llama3.2)
+    │    with: system prompt + history + question
+    │
+    ▼
+Ollama (llama3.2)
+    │
+    │ 8. Generate answer
+    │
+    ▼
+Backend
+    │
+    │ 9. Persist user message + assistant message (with sources JSON)
+    │ 10. Auto-title conversation if first message
+    │
+    ▼
+Frontend
+    │
+    │ 11. Display answer + collapsible source citations
+    └─── (filename + page number, links to /history)
+```
+
+### 6. Export Flow
 
 ```
 User Browser
@@ -275,7 +367,8 @@ User Browser
   - Real-time status polling
   - Split-view result display
   - Export functionality
-- **Technology**: React 18, TypeScript, Vite, React Router, Axios
+  - RAG search with conversation history and source citations
+- **Technology**: React 19, TypeScript, Vite 7, React Router 7, Axios, Tailwind CSS 4
 
 ### Backend (FastAPI)
 - **Responsibility**: REST API and business logic
@@ -284,15 +377,17 @@ User Browser
   - Database operations
   - Result reconstruction from chunks
   - Export formatting
-- **Technology**: FastAPI, SQLAlchemy, Pydantic, Uvicorn
+  - Conversation management for RAG search
+- **Technology**: FastAPI, SQLAlchemy 2, Pydantic, Uvicorn
 
 ### Worker Process
-- **Responsibility**: Asynchronous OCR processing
+- **Responsibility**: Asynchronous OCR processing and RAG indexing
 - **Key Features**:
-  - Database polling with row locking
+  - Database polling with row locking (`SELECT FOR UPDATE SKIP LOCKED`)
   - Image/PDF handling
   - dots.ocr API integration
   - Result chunking and storage
+  - Auto-indexing completed documents into ChromaDB
 - **Technology**: Python, requests, Pillow, pdf2image
 - **Concurrency**: 3 parallel instances
 
@@ -301,8 +396,17 @@ User Browser
 - **Key Features**:
   - Upload metadata tracking
   - Chunked OCR result storage
-  - Status management
+  - Conversation and message history for RAG
 - **Technology**: SQLite (dev), PostgreSQL (prod)
+
+### RAG Layer
+- **Responsibility**: Semantic search over OCR'd document content
+- **Key Features**:
+  - Per-page embedding and vector storage
+  - Filtered search by document selection
+  - Answer generation with source attribution
+  - Persistent multi-turn conversation history
+- **Technology**: ChromaDB (vector store), Ollama `nomic-embed-text` (embeddings), Ollama `llama3.2` (LLM)
 
 ### dots.ocr Server
 - **Responsibility**: OCR inference
@@ -326,6 +430,8 @@ User Browser
 └──────────────┘
       │
       ├─ SQLite (./app.db)
+      ├─ ChromaDB (./chroma_db/)
+      ├─ Ollama (port 11434)  ← nomic-embed-text + llama3.2
       └─ dots.ocr vLLM (port 8001)
 ```
 
@@ -364,6 +470,8 @@ User Browser
 4. **OCR Server**: Scale vLLM horizontally with load balancer
 5. **Frontend**: Add nginx reverse proxy for production
 6. **Caching**: Add Redis for status polling optimization
+7. **Vector Store**: ChromaDB can be replaced with a distributed vector DB (Qdrant, Weaviate) for large-scale deployments
+8. **LLM**: Swap `llama3.2` for a larger/faster Ollama model via the `OLLAMA_LLM_MODEL` env var; no code changes needed
 
 ## Security Notes
 

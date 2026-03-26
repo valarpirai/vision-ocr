@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api import upload
+from .api import upload, rag
 from .database import Base, engine
 
 # Create tables
@@ -19,6 +19,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(upload.router, prefix="/api", tags=["upload"])
+app.include_router(rag.router, prefix="/api", tags=["rag"])
 
 
 @app.get("/")

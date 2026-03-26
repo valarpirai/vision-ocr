@@ -1,5 +1,13 @@
 import axios from "axios";
-import type { Upload, UploadListItem, StatusResponse } from "../types";
+import type {
+  Upload,
+  UploadListItem,
+  StatusResponse,
+  ConversationListItem,
+  ConversationDetail,
+  AskRequest,
+  AskResponse,
+} from "../types";
 
 const API_BASE_URL = "http://localhost:8000/api";
 
@@ -64,4 +72,33 @@ export const getFileUrl = (uploadId: string): string => {
 export const retryUpload = async (uploadId: string): Promise<Upload> => {
   const response = await api.post(`/uploads/${uploadId}/retry`);
   return response.data.upload;
+};
+
+// RAG / Search API
+
+export const createConversation = async (): Promise<ConversationListItem> => {
+  const response = await api.post("/conversations");
+  return response.data;
+};
+
+export const getConversations = async (): Promise<ConversationListItem[]> => {
+  const response = await api.get("/conversations");
+  return response.data;
+};
+
+export const getConversation = async (id: string): Promise<ConversationDetail> => {
+  const response = await api.get(`/conversations/${id}`);
+  return response.data;
+};
+
+export const deleteConversation = async (id: string): Promise<void> => {
+  await api.delete(`/conversations/${id}`);
+};
+
+export const askQuestion = async (
+  conversationId: string,
+  request: AskRequest
+): Promise<AskResponse> => {
+  const response = await api.post(`/conversations/${conversationId}/messages`, request);
+  return response.data;
 };

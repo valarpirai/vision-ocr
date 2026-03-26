@@ -11,6 +11,12 @@ module.exports = {
         WORKER_POLL_INTERVAL: "5",
         WORKER_TIMEOUT: "300",
         MAX_FILE_SIZE: "52428800",
+        OLLAMA_BASE_URL: "http://localhost:11434",
+        OLLAMA_EMBED_MODEL: "nomic-embed-text",
+        OLLAMA_LLM_MODEL: "llama3.2",
+        CHROMA_PERSIST_DIR: "./chroma_db",
+        RAG_N_RESULTS: "5",
+        RAG_CONTEXT_WINDOW: "10",
       },
     },
     {
@@ -24,6 +30,9 @@ module.exports = {
         UPLOAD_DIR: "./uploads",
         WORKER_POLL_INTERVAL: "5",
         WORKER_TIMEOUT: "300",
+        OLLAMA_BASE_URL: "http://localhost:11434",
+        OLLAMA_EMBED_MODEL: "nomic-embed-text",
+        CHROMA_PERSIST_DIR: "./chroma_db",
       },
     },
     {
