@@ -5,7 +5,7 @@ import json
 import shutil
 from typing import Optional, List
 from urllib.parse import quote
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.responses import Response, FileResponse
 from sqlalchemy.orm import Session
 from ..database import get_db
@@ -78,7 +78,7 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
 @router.get("/uploads", response_model=List[UploadResponse])
 def list_uploads(
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
     status: Optional[UploadStatus] = None,
     db: Session = Depends(get_db)
 ):
@@ -141,7 +141,7 @@ def get_upload_file(upload_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/uploads/{upload_id}", status_code=204)
-def delete_upload(upload_id: str, db: Session = Depends(get_db)):
+def delete_upload(upload_id: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """Delete an upload and all associated data (OCR chunks, ChromaDB vectors, file on disk)."""
     upload = db.query(Upload).filter(Upload.id == upload_id).first()
     if not upload:
@@ -150,12 +150,6 @@ def delete_upload(upload_id: str, db: Session = Depends(get_db)):
     if upload.status == UploadStatus.PROCESSING:
         raise HTTPException(status_code=400, detail="Cannot delete an upload that is currently processing")
 
-    # Remove ChromaDB vectors (non-fatal)
-    try:
-        rag_indexer.delete_upload(upload_id)
-    except Exception:
-        pass
-
     # Delete file from disk
     upload_dir = os.path.dirname(upload.file_path)
     if os.path.exists(upload_dir):
@@ -163,6 +157,16 @@ def delete_upload(upload_id: str, db: Session = Depends(get_db)):
 
     db.delete(upload)
     db.commit()
+
+    # Remove ChromaDB vectors in the background (slow — don't block the response)
+    background_tasks.add_task(_delete_chroma_vectors, upload_id)
+
+
+def _delete_chroma_vectors(upload_id: str):
+    try:
+        rag_indexer.delete_upload(upload_id)
+    except Exception as e:
+        print(f"Warning: failed to delete ChromaDB vectors for {upload_id}: {e}")
 
 
 @router.post("/uploads/{upload_id}/retry")

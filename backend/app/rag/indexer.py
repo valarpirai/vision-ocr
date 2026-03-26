@@ -67,6 +67,4 @@ def index_upload(upload_id: str, filename: str, ocr_result: dict) -> int:
 def delete_upload(upload_id: str):
     """Remove all ChromaDB entries for a given upload."""
     collection = chroma_client.get_collection()
-    results = collection.get(where={"upload_id": upload_id})
-    if results["ids"]:
-        collection.delete(ids=results["ids"])
+    collection.delete(where={"upload_id": upload_id})

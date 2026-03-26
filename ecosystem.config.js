@@ -38,8 +38,8 @@ module.exports = {
     {
       name: "frontend",
       cwd: "./frontend",
-      script: "./node_modules/.bin/vite",
-      interpreter: "/Users/valarpirai.annadurai/.nvm/versions/node/v22.22.0/bin/node",
+      script: "/Users/valarpirai.annadurai/.nvm/versions/node/v22.22.0/bin/node",
+      args: "./node_modules/vite/bin/vite.js",
     },
   ],
 };

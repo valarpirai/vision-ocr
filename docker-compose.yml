@@ -17,6 +17,33 @@ services:
       timeout: 5s
       retries: 5
 
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  ollama-setup:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        ollama pull nomic-embed-text &&
+        ollama pull llama3.2
+      "
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    restart: "no"
+
   backend:
     build:
       context: .
@@ -28,12 +55,26 @@ services:
       WORKER_POLL_INTERVAL: ${WORKER_POLL_INTERVAL:-5}
       WORKER_TIMEOUT: ${WORKER_TIMEOUT:-300}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-52428800}
+      DOTS_OCR_URL: ${DOTS_OCR_URL:-http://host.docker.internal:8001/v1/chat/completions}
+      DOTS_OCR_MODEL: ${DOTS_OCR_MODEL:-rednote-hilab/dots.ocr}
+      DOTS_OCR_PROMPT_MODE: ${DOTS_OCR_PROMPT_MODE:-prompt_layout_all_en}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+      OLLAMA_LLM_MODEL: ${OLLAMA_LLM_MODEL:-llama3.2}
+      CHROMA_PERSIST_DIR: /app/chroma_db
+      RAG_N_RESULTS: ${RAG_N_RESULTS:-5}
+      RAG_CONTEXT_WINDOW: ${RAG_CONTEXT_WINDOW:-10}
+      RAG_MAX_DISTANCE: ${RAG_MAX_DISTANCE:-0.7}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
     volumes:
       - uploads_data:/app/uploads
+      - chroma_data:/app/chroma_db
     ports:
       - "8000:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
 
   worker:
@@ -46,10 +87,21 @@ services:
       UPLOAD_DIR: /app/uploads
       WORKER_POLL_INTERVAL: ${WORKER_POLL_INTERVAL:-5}
       WORKER_TIMEOUT: ${WORKER_TIMEOUT:-300}
+      DOTS_OCR_URL: ${DOTS_OCR_URL:-http://host.docker.internal:8001/v1/chat/completions}
+      DOTS_OCR_MODEL: ${DOTS_OCR_MODEL:-rednote-hilab/dots.ocr}
+      DOTS_OCR_PROMPT_MODE: ${DOTS_OCR_PROMPT_MODE:-prompt_layout_all_en}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+      CHROMA_PERSIST_DIR: /app/chroma_db
+      RAG_N_RESULTS: ${RAG_N_RESULTS:-5}
+      RAG_MAX_DISTANCE: ${RAG_MAX_DISTANCE:-0.7}
     volumes:
       - uploads_data:/app/uploads
+      - chroma_data:/app/chroma_db
     depends_on:
       postgres:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
     deploy:
       replicas: 3
@@ -57,11 +109,12 @@ services:
   frontend:
     image: node:20-alpine
     working_dir: /app
-    command: sh -c "npm install && npm run dev -- --host"
+    command: sh -c "npm install -g pnpm && pnpm install && pnpm dev -- --host"
     environment:
       VITE_API_URL: http://localhost:8000
     volumes:
       - ./frontend:/app
+      - /app/node_modules
     ports:
       - "5173:5173"
     depends_on:
@@ -70,3 +123,5 @@ services:
 volumes:
   postgres_data:
   uploads_data:
+  chroma_data:
+  ollama_data:
